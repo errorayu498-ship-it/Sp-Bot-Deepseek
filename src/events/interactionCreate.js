@@ -23,7 +23,7 @@ module.exports = {
                     if (!interaction.member.roles.cache.has(adminRole)) {
                         const errorEmbed = new PremiumEmbed()
                             .setError()
-                            .setTitle('Permission Denied')
+                            .setTitle('❌ Permission Denied')
                             .setDescription('You do not have permission to use this command.');
                         
                         return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
@@ -35,12 +35,16 @@ module.exports = {
             
             // Handle buttons
             if (interaction.isButton()) {
-                if (interaction.customId.startsWith('giveaway_')) {
+                const customId = interaction.customId;
+                
+                if (customId.startsWith('giveaway_enter_')) {
                     await GiveawayManager.handleGiveawayButton(interaction, client);
+                    return;
                 }
                 
-                if (interaction.customId.startsWith('panel_')) {
+                if (customId.startsWith('panel_')) {
                     await handlePanelButton(interaction, client);
+                    return;
                 }
             }
             
@@ -49,69 +53,75 @@ module.exports = {
             
             const errorEmbed = new PremiumEmbed()
                 .setError()
-                .setTitle('Interaction Failed')
+                .setTitle('❌ Interaction Failed')
                 .setDescription('An error occurred while processing this interaction.')
-                .addField('Error', error.message.slice(0, 1000));
+                .addField('Error Details', error.message.slice(0, 1000) || 'Unknown error');
             
             const reply = {
                 embeds: [errorEmbed],
                 ephemeral: true
             };
             
-            if (interaction.deferred || interaction.replied) {
-                await interaction.editReply(reply);
-            } else {
-                await interaction.reply(reply);
+            try {
+                if (interaction.deferred) {
+                    await interaction.editReply(reply);
+                } else if (!interaction.replied) {
+                    await interaction.reply(reply);
+                }
+            } catch (e) {
+                logger.error('Failed to send error response:', e);
             }
         }
     }
 };
 
 async function handlePanelButton(interaction, client) {
+    await interaction.deferReply({ ephemeral: true });
+    
     const action = interaction.customId.replace('panel_', '');
     
     const panelActions = {
-        'giveaway_create': () => {
-            return {
-                title: 'Create Giveaway',
-                description: 'Use `/cgw` command to create a new giveaway!'
-            };
+        'giveaway_create': {
+            title: '🎉 Create Giveaway',
+            description: 'Use `/cgw` command to create a new giveaway!\n\n**Example:**\n`/cgw prize:Nitro winners:1 duration:24h`'
         },
-        'giveaway_list': () => {
-            return {
-                title: 'Active Giveaways',
-                description: 'Use `/gwinfo` to see all giveaways!'
-            };
+        'giveaway_list': {
+            title: '📋 Active Giveaways',
+            description: 'Use `/gwinfo` to see all giveaways!'
         },
-        'xp_leaderboard': () => {
-            return {
-                title: 'XP Leaderboard',
-                description: 'Use `!leaderboard` to see top XP earners!'
-            };
+        'xp_leaderboard': {
+            title: '🏆 XP Leaderboard',
+            description: 'Use `!leaderboard` to see top XP earners!'
         },
-        'invite_leaderboard': () => {
-            return {
-                title: 'Invite Leaderboard',
-                description: 'Use `!inviteleaderboard` to see top inviters!'
-            };
+        'invite_leaderboard': {
+            title: '👥 Invite Leaderboard',
+            description: 'Use `!inviteleaderboard` to see top inviters!'
         },
-        'help': () => {
-            return {
-                title: 'Help Menu',
-                description: 'Use `/admhelp` for admin commands or `!help` for public commands!'
-            };
+        'help': {
+            title: '❓ Help Menu',
+            description: 'Use `/admhelp` for admin commands or `!help` for public commands!'
+        },
+        'refresh': {
+            title: '🔄 Panel Refreshed',
+            description: 'The panel information is up to date!'
         }
     };
     
     const actionHandler = panelActions[action];
     
     if (actionHandler) {
-        const data = actionHandler();
         const embed = new PremiumEmbed()
             .setInfo()
-            .setTitle(data.title)
-            .setDescription(data.description);
+            .setTitle(actionHandler.title)
+            .setDescription(actionHandler.description);
         
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.editReply({ embeds: [embed] });
+    } else {
+        const embed = new PremiumEmbed()
+            .setWarning()
+            .setTitle('⚠️ Unknown Action')
+            .setDescription('This feature is coming soon!');
+        
+        await interaction.editReply({ embeds: [embed] });
     }
 }
