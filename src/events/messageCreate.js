@@ -7,19 +7,43 @@ const cooldowns = new Map();
 const XP_PER_MESSAGE = 5;
 const XP_COOLDOWN = 60000; // 1 minute
 
+// Cache for guild prefixes to reduce database calls
+const prefixCache = new Map();
+
+async function getGuildPrefix(guildId) {
+    // Check cache first
+    if (prefixCache.has(guildId)) {
+        return prefixCache.get(guildId);
+    }
+    
+    // Get from database
+    const guildData = await Guild.findOne({ guildId });
+    const prefix = guildData?.settings?.prefix || '!';
+    
+    // Store in cache for 5 minutes
+    prefixCache.set(guildId, prefix);
+    setTimeout(() => prefixCache.delete(guildId), 300000);
+    
+    return prefix;
+}
+
 module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
         if (message.author.bot || !message.guild) return;
 
-        // Get guild settings
+        // Get guild settings with prefix
         let guildData = await Guild.findOne({ guildId: message.guild.id });
         if (!guildData) {
-            guildData = new Guild({ guildId: message.guild.id, name: message.guild.name });
+            guildData = new Guild({ 
+                guildId: message.guild.id, 
+                name: message.guild.name,
+                settings: { prefix: '!' }
+            });
             await guildData.save();
         }
         
-        const prefix = guildData?.settings?.prefix || '!';
+        const prefix = await getGuildPrefix(message.guild.id);
 
         // Handle prefix commands
         if (message.content.startsWith(prefix)) {
@@ -69,7 +93,6 @@ module.exports = {
         if (guildData?.settings?.xpEnabled) {
             const xpChannel = guildData.settings.xpChannel;
             
-            // If XP channel is set, only give XP in that channel
             if (xpChannel && message.channel.id !== xpChannel) return;
             
             const cooldownKey = `${message.guild.id}-${message.author.id}`;
@@ -102,7 +125,6 @@ module.exports = {
                 userData.messages += 1;
                 userData.lastMessage = new Date();
                 
-                // Level up calculation
                 const newLevel = Math.floor(0.1 * Math.sqrt(userData.totalXp));
                 
                 if (newLevel > oldLevel) {
@@ -126,7 +148,6 @@ module.exports = {
                 
                 await userData.save();
                 
-                // Update guild stats
                 guildData.stats.totalXpGiven += XP_PER_MESSAGE;
                 await guildData.save();
                 
@@ -137,7 +158,6 @@ module.exports = {
     }
 };
 
-// Prefix Command Handlers
 async function handleXpCommand(message, args, client) {
     try {
         const target = message.mentions.users.first() || message.author;
@@ -161,6 +181,11 @@ async function handleXpCommand(message, args, client) {
         const progress = ((userData.totalXp - Math.pow(userData.level / 0.1, 2)) / 
                          (Math.pow((userData.level + 1) / 0.1, 2) - Math.pow(userData.level / 0.1, 2))) * 100;
         
+        // Create progress bar
+        const barLength = 20;
+        const filledLength = Math.floor((progress / 100) * barLength);
+        const progressBar = '█'.repeat(filledLength) + '░'.repeat(barLength - filledLength);
+        
         const embed = new PremiumEmbed()
             .setTitle(`📊 XP Card - ${target.username}`)
             .setThumbnail(target.displayAvatarURL({ dynamic: true }))
@@ -168,7 +193,7 @@ async function handleXpCommand(message, args, client) {
             .addField('✨ Current XP', `${userData.xp}`, true)
             .addField('💫 Total XP', `${userData.totalXp}`, true)
             .addField('💬 Messages', `${userData.messages}`, true)
-            .addField('📊 Progress', `${progress.toFixed(1)}%`, true)
+            .addField('📊 Progress', `${progressBar} ${progress.toFixed(1)}%`, false)
             .addField('⬆️ XP to Next Level', `${Math.floor(xpNeeded)}`, true)
             .setFooter({ text: `Requested by ${message.author.username}` });
         
@@ -183,10 +208,11 @@ async function handleCheckXpCommand(message, args, client) {
     const target = message.mentions.users.first();
     
     if (!target) {
+        const prefix = await getGuildPrefix(message.guild.id);
         const embed = new PremiumEmbed()
             .setError()
             .setTitle('❌ Invalid Usage')
-            .setDescription('Please mention a user!\nExample: `!checkxp @user`');
+            .setDescription(`Please mention a user!\nExample: \`${prefix}checkxp @user\``);
         
         return message.reply({ embeds: [embed] });
     }
@@ -215,6 +241,8 @@ async function handleLeaderboardCommand(message, args, client) {
             .setThumbnail(message.guild.iconURL({ dynamic: true }));
         
         let leaderboardText = '';
+        let userRank = null;
+        let userPosition = 1;
         
         for (let i = 0; i < users.length; i++) {
             const user = users[i];
@@ -224,11 +252,23 @@ async function handleLeaderboardCommand(message, args, client) {
             const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
             
             leaderboardText += `${medal} **${username}**\n`;
-            leaderboardText += `   └ Level ${user.level} • ${user.totalXp} XP • ${user.messages} msgs\n\n`;
+            leaderboardText += `   └ Level ${user.level} • ${user.totalXp.toLocaleString()} XP\n\n`;
+            
+            if (user.userId === message.author.id) {
+                userRank = i + 1;
+            }
+            userPosition++;
         }
         
         embed.setDescription(leaderboardText);
-        embed.setFooter({ text: `Requested by ${message.author.username} • Total Members: ${users.length}` });
+        
+        if (userRank) {
+            embed.addField('📍 Your Rank', `#${userRank} out of ${users.length} members`, true);
+        } else {
+            embed.addField('📍 Your Rank', 'Not in top 20', true);
+        }
+        
+        embed.setFooter({ text: `Requested by ${message.author.username} • Total: ${users.length} members` });
         
         await message.reply({ embeds: [embed] });
         
@@ -269,10 +309,11 @@ async function handleCheckInviteCommand(message, args, client) {
     const target = message.mentions.users.first();
     
     if (!target) {
+        const prefix = await getGuildPrefix(message.guild.id);
         const embed = new PremiumEmbed()
             .setError()
             .setTitle('❌ Invalid Usage')
-            .setDescription('Please mention a user!\nExample: `!checkinvite @user`');
+            .setDescription(`Please mention a user!\nExample: \`${prefix}checkinvite @user\``);
         
         return message.reply({ embeds: [embed] });
     }
@@ -301,11 +342,14 @@ async function handleInviteLeaderboardCommand(message, args, client) {
             .setThumbnail(message.guild.iconURL({ dynamic: true }));
         
         let leaderboardText = '';
+        let hasInvites = false;
+        let userRank = null;
         
         for (let i = 0; i < users.length; i++) {
             const user = users[i];
             if (user.invites.total === 0) continue;
             
+            hasInvites = true;
             const member = await message.guild.members.fetch(user.userId).catch(() => null);
             const username = member?.user.username || 'Unknown User';
             
@@ -313,13 +357,22 @@ async function handleInviteLeaderboardCommand(message, args, client) {
             
             leaderboardText += `${medal} **${username}**\n`;
             leaderboardText += `   └ ${user.invites.total} invites (${user.invites.regular} regular, ${user.invites.bonus} bonus)\n\n`;
+            
+            if (user.userId === message.author.id) {
+                userRank = i + 1;
+            }
         }
         
-        if (!leaderboardText) {
+        if (!hasInvites) {
             leaderboardText = 'No invites yet! Start inviting people to appear here!';
         }
         
         embed.setDescription(leaderboardText);
+        
+        if (userRank) {
+            embed.addField('📍 Your Rank', `#${userRank}`, true);
+        }
+        
         embed.setFooter({ text: `Requested by ${message.author.username}` });
         
         await message.reply({ embeds: [embed] });
@@ -336,12 +389,15 @@ async function handleHelpCommand(message, prefix) {
         .addField('📊 XP Commands',
             `\`${prefix}xp\` - Check your XP and level\n` +
             `\`${prefix}checkxp @user\` - Check someone's XP\n` +
-            `\`${prefix}leaderboard\` - View XP leaderboard`
+            `\`${prefix}leaderboard\` - View XP leaderboard\n` +
+            `\`${prefix}lb\` - Alias for leaderboard`
         )
         .addField('📨 Invite Commands',
             `\`${prefix}invite\` - Check your invites\n` +
+            `\`${prefix}invites\` - Alias for invite\n` +
             `\`${prefix}checkinvite @user\` - Check someone's invites\n` +
-            `\`${prefix}inviteleaderboard\` - View invite leaderboard`
+            `\`${prefix}inviteleaderboard\` - View invite leaderboard\n` +
+            `\`${prefix}ilb\` - Alias for inviteleaderboard`
         )
         .addField('ℹ️ Other Commands',
             `\`${prefix}help\` - Show this help menu`
@@ -352,7 +408,7 @@ async function handleHelpCommand(message, prefix) {
             '• Invite friends to climb the invite leaderboard\n' +
             '• Use slash commands for admin features'
         )
-        .setFooter({ text: 'Made with ❤️ • Type !help for commands' });
+        .setFooter({ text: `Made with ❤️ • Current Prefix: ${prefix}` });
     
     await message.reply({ embeds: [embed] });
 }
