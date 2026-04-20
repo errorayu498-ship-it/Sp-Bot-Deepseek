@@ -30,11 +30,11 @@ client.cooldowns = new Collection();
 
 // Status rotation
 client.statuses = [
-    { name: 'Saraiki Bot, type: ActivityType.Watching },
-    { name: 'Made By Subhan', type: ActivityType.Watching },
-    { name: 'Powered By Saraiki-Plays', type: ActivityType.Watching },
+    { name: 'Saraiki Bot', type: ActivityType.Playing },
+    { name: 'Made By Subhan', type: ActivityType.Playing },
+    { name: 'Powered By Saraiki-Plays', type: ActivityType.Playing },
     { name: 'CPU Usage 81%', type: ActivityType.Playing },
-    { name: '@SARAIKI_PLAYS-S', type: ActivityType.Competing }
+    { name: '@SARAIKI_PLAYS-S', type: ActivityType.Playing }
 ];
 
 // Load commands
