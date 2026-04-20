@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
+const { SlashCommandBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 const { PremiumEmbed } = require('../../utils/embedBuilder');
 const Guild = require('../../models/Guild');
 
@@ -24,7 +24,9 @@ module.exports = {
             )
             .addField('⚙️ Bot Configuration',
                 `**Current Prefix:** \`${prefix}\`\n` +
-                `**XP Channel:** ${guildData?.settings?.xpChannel ? `<#${guildData.settings.xpChannel}>` : 'Not Set'}\n` +
+                `**XP Channel:** ${guildData?.settings?.xpChannel ? `<#${guildData.settings.xpChannel}>` : '❌ Not Set'}\n` +
+                `**Log Channel:** ${guildData?.settings?.logChannel ? `<#${guildData.settings.logChannel}>` : '❌ Not Set'}\n` +
+                `**Invite Log Channel:** ${guildData?.settings?.inviteLogChannel ? `<#${guildData.settings.inviteLogChannel}>` : '❌ Not Set'}\n` +
                 `**XP System:** ${guildData?.settings?.xpEnabled ? '✅ Enabled' : '❌ Disabled'}\n` +
                 `**Invite Tracking:** ${guildData?.settings?.inviteTracking ? '✅ Enabled' : '❌ Disabled'}`
             )
@@ -136,8 +138,8 @@ module.exports = {
                 .setStyle(ButtonStyle.Secondary)
                 .setEmoji('🔄'),
             new ButtonBuilder()
-                .setCustomId('panel_prefix_menu')
-                .setLabel('Prefix Menu')
+                .setCustomId('panel_log_settings')
+                .setLabel('Log Settings')
                 .setStyle(ButtonStyle.Success)
                 .setEmoji('📝')
         );
