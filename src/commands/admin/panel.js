@@ -1,5 +1,6 @@
-const { SlashCommandBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+const { SlashCommandBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const { PremiumEmbed } = require('../../utils/embedBuilder');
+const Guild = require('../../models/Guild');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -9,6 +10,9 @@ module.exports = {
     adminOnly: true,
     
     async execute(interaction) {
+        const guildData = await Guild.findOne({ guildId: interaction.guild.id });
+        const prefix = guildData?.settings?.prefix || '!';
+        
         const embed = new PremiumEmbed()
             .setTitle('🛠️ Admin Control Panel')
             .setDescription('Welcome to the advanced bot control panel!')
@@ -17,6 +21,12 @@ module.exports = {
                 `**Members:** ${interaction.guild.memberCount}\n` +
                 `**Channels:** ${interaction.guild.channels.cache.size}\n` +
                 `**Roles:** ${interaction.guild.roles.cache.size}`
+            )
+            .addField('⚙️ Bot Configuration',
+                `**Current Prefix:** \`${prefix}\`\n` +
+                `**XP Channel:** ${guildData?.settings?.xpChannel ? `<#${guildData.settings.xpChannel}>` : 'Not Set'}\n` +
+                `**XP System:** ${guildData?.settings?.xpEnabled ? '✅ Enabled' : '❌ Disabled'}\n` +
+                `**Invite Tracking:** ${guildData?.settings?.inviteTracking ? '✅ Enabled' : '❌ Disabled'}`
             )
             .addField('🎉 Giveaway Controls',
                 '• Create and manage giveaways\n' +
@@ -55,7 +65,12 @@ module.exports = {
                 .setCustomId('panel_giveaway_end')
                 .setLabel('End Giveaway')
                 .setStyle(ButtonStyle.Danger)
-                .setEmoji('⏹️')
+                .setEmoji('⏹️'),
+            new ButtonBuilder()
+                .setCustomId('panel_giveaway_reroll')
+                .setLabel('Reroll')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('🔄')
         );
         
         const row2 = new ActionRowBuilder().addComponents(
@@ -73,7 +88,12 @@ module.exports = {
                 .setCustomId('panel_xp_leaderboard')
                 .setLabel('XP Leaderboard')
                 .setStyle(ButtonStyle.Primary)
-                .setEmoji('🏆')
+                .setEmoji('🏆'),
+            new ButtonBuilder()
+                .setCustomId('panel_xp_settings')
+                .setLabel('XP Settings')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('⚙️')
         );
         
         const row3 = new ActionRowBuilder().addComponents(
@@ -91,7 +111,12 @@ module.exports = {
                 .setCustomId('panel_invite_leaderboard')
                 .setLabel('Invite Leaderboard')
                 .setStyle(ButtonStyle.Secondary)
-                .setEmoji('👥')
+                .setEmoji('👥'),
+            new ButtonBuilder()
+                .setCustomId('panel_prefix_settings')
+                .setLabel('Change Prefix')
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji('🔧')
         );
         
         const row4 = new ActionRowBuilder().addComponents(
@@ -109,7 +134,12 @@ module.exports = {
                 .setCustomId('panel_refresh')
                 .setLabel('Refresh')
                 .setStyle(ButtonStyle.Secondary)
-                .setEmoji('🔄')
+                .setEmoji('🔄'),
+            new ButtonBuilder()
+                .setCustomId('panel_prefix_menu')
+                .setLabel('Prefix Menu')
+                .setStyle(ButtonStyle.Success)
+                .setEmoji('📝')
         );
         
         await interaction.reply({ 
