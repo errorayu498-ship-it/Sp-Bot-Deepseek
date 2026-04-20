@@ -4,17 +4,17 @@ const User = require('../../models/User');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('addinvites')
-        .setDescription('Add invites to a user')
+        .setName('editinvites')
+        .setDescription('Set a user\'s total invite count')
         .addUserOption(option =>
             option.setName('user')
-                .setDescription('The user to add invites to')
+                .setDescription('The user to edit invites for')
                 .setRequired(true))
         .addIntegerOption(option =>
             option.setName('amount')
-                .setDescription('Number of invites to add')
+                .setDescription('New total invite count')
                 .setRequired(true)
-                .setMinValue(1)),
+                .setMinValue(0)),
     
     adminOnly: true,
     
@@ -37,18 +37,21 @@ module.exports = {
         }
         
         const oldInvites = userData.invites.total;
-        userData.invites.total += amount;
-        userData.invites.bonus += amount;
+        const difference = amount - userData.invites.regular;
+        
+        userData.invites.total = amount;
+        userData.invites.bonus = Math.max(0, difference);
         
         await userData.save();
         
         const embed = new PremiumEmbed()
             .setSuccess()
-            .setTitle('Invites Added')
-            .setDescription(`Added ${amount} invites to ${target.tag}`)
-            .addField('Previous Invites', oldInvites.toString(), true)
-            .addField('New Total', userData.invites.total.toString(), true)
-            .addField('Regular Invites', userData.invites.regular.toString(), true);
+            .setTitle('Invites Updated')
+            .setDescription(`Updated invite count for ${target.tag}`)
+            .addField('Previous Total', oldInvites.toString(), true)
+            .addField('New Total', amount.toString(), true)
+            .addField('Regular Invites', userData.invites.regular.toString(), true)
+            .addField('Bonus Invites', userData.invites.bonus.toString(), true);
         
         await interaction.editReply({ embeds: [embed] });
     }
