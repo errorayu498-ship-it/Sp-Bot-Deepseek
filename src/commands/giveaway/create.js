@@ -19,8 +19,8 @@ module.exports = {
                 .setMaxValue(10))
         .addStringOption(option =>
             option.setName('duration')
-                .setDescription('Duration (e.g., 1h, 30m, 1d)')
-                .setRequired(true))
+                .setDescription('Duration (e.g., 1h, 30m, 1d) - Optional, default 24h')
+                .setRequired(false))
         .addChannelOption(option =>
             option.setName('channel')
                 .setDescription('Channel for the giveaway')
@@ -48,7 +48,7 @@ module.exports = {
         
         const prize = interaction.options.getString('prize');
         const winners = interaction.options.getInteger('winners');
-        const duration = interaction.options.getString('duration');
+        let duration = interaction.options.getString('duration') || '24h'; // Default 24 hours
         const channel = interaction.options.getChannel('channel') || interaction.channel;
         const xpReq = interaction.options.getInteger('xp_requirement') || 0;
         const inviteReq = interaction.options.getInteger('invite_requirement') || 0;
@@ -60,30 +60,41 @@ module.exports = {
             const errorEmbed = new PremiumEmbed()
                 .setError()
                 .setTitle('Invalid Duration')
-                .setDescription('Duration must be at least 1 minute!');
+                .setDescription('Duration must be at least 1 minute! Using default 24h.');
             
-            return interaction.editReply({ embeds: [errorEmbed] });
+            duration = '24h';
         }
         
-        const endTime = new Date(Date.now() + durationMs);
+        const finalDurationMs = ms(duration) || 86400000; // 24h default
+        const endTime = new Date(Date.now() + finalDurationMs);
         
         // Generate unique giveaway ID
         const giveawayId = Math.floor(1000 + Math.random() * 9000).toString();
         
+        // Requirements display
+        let requirementsText = '';
+        if (xpReq > 0) requirementsText += `• XP Required: ${xpReq}\n`;
+        if (inviteReq > 0) requirementsText += `• Invites Required: ${inviteReq}\n`;
+        if (roleReq) requirementsText += `• Role Required: ${roleReq}\n`;
+        if (!requirementsText) requirementsText = '• None';
+        
         // Create giveaway embed
         const embed = new PremiumEmbed()
             .setTitle(`🎉 ${prize}`)
-            .setDescription(`**Hosted by:** ${interaction.user}\n\n**Ends:** <t:${Math.floor(endTime.getTime() / 1000)}:R>\n**Entries:** 0\n**Winners:** ${winners}`)
-            .addField('Requirements', 
-                `${xpReq > 0 ? `• XP: ${xpReq}` : ''}${inviteReq > 0 ? `\n• Invites: ${inviteReq}` : ''}${roleReq ? `\n• Role: ${roleReq}` : ''}` || '• None')
-            .setFooter({ text: `Giveaway ID: ${giveawayId}` });
+            .setDescription(
+                `**Hosted by:** ${interaction.user}\n\n` +
+                `**Ends:** <t:${Math.floor(endTime.getTime() / 1000)}:R>\n` +
+                `**Entries:** 0\n` +
+                `**Winners:** ${winners}`
+            )
+            .addField('📋 Requirements', requirementsText)
+            .setFooter({ text: `Giveaway ID: ${giveawayId} • Click the button below to enter!` });
         
-        // Create enter button
+        // Create enter button with unique custom ID
         const enterButton = new ButtonBuilder()
             .setCustomId(`giveaway_enter_${giveawayId}`)
-            .setLabel('Enter Giveaway')
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('🎉');
+            .setLabel('🎉 Enter Giveaway')
+            .setStyle(ButtonStyle.Success);
         
         const row = new ActionRowBuilder().addComponents(enterButton);
         
@@ -104,7 +115,7 @@ module.exports = {
             requirements: {
                 xp: xpReq,
                 invites: inviteReq,
-                role: roleReq?.id
+                role: roleReq?.id || null
             },
             startTime: new Date(),
             endTime
@@ -115,22 +126,24 @@ module.exports = {
             messageId: giveawayMessage.id,
             channelId: channel.id,
             endTime: endTime.getTime(),
-            winners
+            winners,
+            prize
         });
         
         // Schedule giveaway end
         setTimeout(() => {
             GiveawayManager.endGiveaway(giveawayId, client);
-        }, durationMs);
+        }, finalDurationMs);
         
         const successEmbed = new PremiumEmbed()
             .setSuccess()
-            .setTitle('Giveaway Created!')
+            .setTitle('✅ Giveaway Created!')
             .setDescription(`Giveaway created successfully in ${channel}`)
-            .addField('Giveaway ID', giveawayId)
-            .addField('Prize', prize)
-            .addField('Winners', winners.toString())
-            .addField('Ends', `<t:${Math.floor(endTime.getTime() / 1000)}:F>`);
+            .addField('🎁 Prize', prize, true)
+            .addField('🆔 Giveaway ID', giveawayId, true)
+            .addField('👑 Winners', winners.toString(), true)
+            .addField('⏰ Ends', `<t:${Math.floor(endTime.getTime() / 1000)}:F>`, true)
+            .addField('📋 Requirements', requirementsText);
         
         await interaction.editReply({ embeds: [successEmbed] });
         
