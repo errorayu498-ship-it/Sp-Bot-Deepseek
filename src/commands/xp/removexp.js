@@ -4,18 +4,17 @@ const User = require('../../models/User');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('addxp')
-        .setDescription('Add XP to a user')
+        .setName('removexp')
+        .setDescription('Remove XP from a user')
         .addUserOption(option =>
             option.setName('user')
-                .setDescription('The user to add XP to')
+                .setDescription('The user to remove XP from')
                 .setRequired(true))
         .addIntegerOption(option =>
             option.setName('amount')
-                .setDescription('Amount of XP to add')
+                .setDescription('Amount of XP to remove')
                 .setRequired(true)
-                .setMinValue(1)
-                .setMaxValue(100000)),
+                .setMinValue(1)),
     
     adminOnly: true,
     
@@ -31,16 +30,18 @@ module.exports = {
         });
         
         if (!userData) {
-            userData = new User({
-                userId: target.id,
-                guildId: interaction.guild.id
-            });
+            const errorEmbed = new PremiumEmbed()
+                .setError()
+                .setTitle('User Not Found')
+                .setDescription('This user has no XP data.');
+            
+            return interaction.editReply({ embeds: [errorEmbed] });
         }
         
         const oldLevel = userData.level;
         
-        userData.xp += amount;
-        userData.totalXp += amount;
+        userData.xp = Math.max(0, userData.xp - amount);
+        userData.totalXp = Math.max(0, userData.totalXp - amount);
         
         const newLevel = Math.floor(0.1 * Math.sqrt(userData.totalXp));
         userData.level = newLevel;
@@ -48,9 +49,9 @@ module.exports = {
         await userData.save();
         
         const embed = new PremiumEmbed()
-            .setSuccess()
-            .setTitle('XP Added')
-            .setDescription(`Added ${amount} XP to ${target.tag}`)
+            .setWarning()
+            .setTitle('XP Removed')
+            .setDescription(`Removed ${amount} XP from ${target.tag}`)
             .addField('New XP', userData.xp.toString(), true)
             .addField('Total XP', userData.totalXp.toString(), true)
             .addField('Level', `${oldLevel} → ${newLevel}`, true);
