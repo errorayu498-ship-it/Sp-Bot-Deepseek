@@ -4,6 +4,7 @@ const guildSchema = new mongoose.Schema({
     guildId: { type: String, required: true, unique: true },
     name: String,
     settings: {
+        prefix: { type: String, default: '!' },
         xpChannel: { type: String, default: null },
         xpEnabled: { type: Boolean, default: true },
         xpPerMessage: { type: Number, default: 5 },
@@ -11,7 +12,9 @@ const guildSchema = new mongoose.Schema({
         inviteTracking: { type: Boolean, default: true },
         adminRoles: [String],
         giveawayManagerRoles: [String],
-        prefix: { type: String, default: '!' }
+        logChannel: { type: String, default: null },
+        inviteLogChannel: { type: String, default: null },
+        levelUpChannel: { type: String, default: null }
     },
     stats: {
         totalGiveaways: { type: Number, default: 0 },
