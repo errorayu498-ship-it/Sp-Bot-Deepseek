@@ -1,17 +1,36 @@
 const { logger } = require('../utils/logger');
 const User = require('../models/User');
-const { PremiumEmbed } = require('../utils/embedBuilder');
+const Guild = require('../models/Guild');
+const { EmbedBuilder } = require('discord.js');
+
+async function sendLog(guild, channelId, embed) {
+    if (!channelId) return;
+    
+    try {
+        const channel = await guild.channels.fetch(channelId).catch(() => null);
+        if (channel) {
+            await channel.send({ embeds: [embed] }).catch(() => {});
+        }
+    } catch (error) {
+        logger.error('Failed to send log:', error);
+    }
+}
 
 module.exports = {
     name: 'guildMemberAdd',
     async execute(member, client) {
         try {
+            const guildData = await Guild.findOne({ guildId: member.guild.id });
+            
             // Track invites
-            const newInvites = await member.guild.invites.fetch();
+            const newInvites = await member.guild.invites.fetch().catch(() => null);
             const oldInvites = client.invites.get(member.guild.id);
             
-            if (oldInvites) {
-                const usedInvite = newInvites.find(inv => {
+            let inviterData = null;
+            let usedInvite = null;
+            
+            if (oldInvites && newInvites) {
+                usedInvite = newInvites.find(inv => {
                     const oldUses = oldInvites.get(inv.code);
                     return oldUses !== undefined && inv.uses > oldUses;
                 });
@@ -19,43 +38,45 @@ module.exports = {
                 if (usedInvite && usedInvite.inviter) {
                     const inviterId = usedInvite.inviter.id;
                     
-                    // Update inviter's stats
-                    let inviterData = await User.findOne({ 
+                    let inviterUserData = await User.findOne({ 
                         userId: inviterId, 
                         guildId: member.guild.id 
                     });
                     
-                    if (!inviterData) {
-                        inviterData = new User({
+                    if (!inviterUserData) {
+                        inviterUserData = new User({
                             userId: inviterId,
                             guildId: member.guild.id
                         });
                     }
                     
-                    inviterData.invites.total += 1;
-                    inviterData.invites.regular += 1;
+                    inviterUserData.invites.total += 1;
+                    inviterUserData.invites.regular += 1;
                     
-                    inviterData.invitedUsers.push({
+                    inviterUserData.invitedUsers.push({
                         userId: member.id,
                         joinedAt: new Date(),
                         isValid: true
                     });
                     
-                    await inviterData.save();
+                    await inviterUserData.save();
+                    inviterData = inviterUserData;
                     
                     logger.info(`${member.user.username} was invited by ${usedInvite.inviter.username}`);
                     
-                    // Send welcome message to inviter
+                    // Send DM to inviter
                     try {
                         const inviter = await member.guild.members.fetch(inviterId);
                         if (inviter) {
-                            const embed = new PremiumEmbed()
-                                .setSuccess()
+                            const embed = new EmbedBuilder()
+                                .setColor(0x00FF00)
                                 .setTitle('🎉 New Member Invited!')
                                 .setDescription(`${member.user} joined using your invite!`)
-                                .addField('Total Invites', inviterData.invites.total.toString(), true)
-                                .addField('Regular Invites', inviterData.invites.regular.toString(), true)
-                                .setFooter({ text: 'Keep inviting to earn rewards!' });
+                                .addFields(
+                                    { name: 'Total Invites', value: `${inviterUserData.invites.total}`, inline: true },
+                                    { name: 'Regular Invites', value: `${inviterUserData.invites.regular}`, inline: true }
+                                )
+                                .setTimestamp();
                             
                             await inviter.send({ embeds: [embed] }).catch(() => {});
                         }
@@ -66,7 +87,61 @@ module.exports = {
             }
             
             // Update invite cache
-            client.invites.set(member.guild.id, new Map(newInvites.map(inv => [inv.code, inv.uses])));
+            if (newInvites) {
+                client.invites.set(member.guild.id, new Map(newInvites.map(inv => [inv.code, inv.uses])));
+            }
+            
+            // Send invite log
+            if (guildData?.settings?.inviteLogChannel) {
+                const logEmbed = new EmbedBuilder()
+                    .setColor(0x00FF00)
+                    .setTitle('📨 Member Joined - Invite Log')
+                    .setDescription(`${member.user} joined the server!`)
+                    .addFields(
+                        { name: 'User', value: `${member.user.tag}`, inline: true },
+                        { name: 'User ID', value: member.id, inline: true },
+                        { name: 'Account Created', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true }
+                    );
+                
+                if (usedInvite && usedInvite.inviter) {
+                    logEmbed.addFields(
+                        { name: 'Invited By', value: `${usedInvite.inviter.tag}`, inline: true },
+                        { name: 'Invite Code', value: usedInvite.code, inline: true },
+                        { name: 'Invite Uses', value: `${usedInvite.uses}`, inline: true }
+                    );
+                    
+                    if (inviterData) {
+                        logEmbed.addFields(
+                            { name: 'Inviter Total Invites', value: `${inviterData.invites.total}`, inline: true }
+                        );
+                    }
+                } else {
+                    logEmbed.addFields(
+                        { name: 'Invited By', value: 'Unknown/Vanity URL', inline: true }
+                    );
+                }
+                
+                logEmbed.setTimestamp()
+                    .setFooter({ text: `Member #${member.guild.memberCount}` });
+                
+                await sendLog(member.guild, guildData.settings.inviteLogChannel, logEmbed);
+            }
+            
+            // Send general log
+            if (guildData?.settings?.logChannel) {
+                const logEmbed = new EmbedBuilder()
+                    .setColor(0x00FF00)
+                    .setTitle('✅ Member Joined')
+                    .setDescription(`${member.user} joined the server!`)
+                    .addFields(
+                        { name: 'User', value: `${member.user.tag}`, inline: true },
+                        { name: 'ID', value: member.id, inline: true },
+                        { name: 'Total Members', value: `${member.guild.memberCount}`, inline: true }
+                    )
+                    .setTimestamp();
+                
+                await sendLog(member.guild, guildData.settings.logChannel, logEmbed);
+            }
             
         } catch (error) {
             logger.error('Guild Member Add Error:', error);
