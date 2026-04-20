@@ -63,29 +63,9 @@ module.exports = {
                     inviterData = inviterUserData;
                     
                     logger.info(`${member.user.username} was invited by ${usedInvite.inviter.username}`);
-                    
-                    // Send DM to inviter
-                    try {
-                        const inviter = await member.guild.members.fetch(inviterId);
-                        if (inviter) {
-                            const embed = new EmbedBuilder()
-                                .setColor(0x00FF00)
-                                .setTitle('🎉 New Member Invited!')
-                                .setDescription(`${member.user} joined using your invite!`)
-                                .addFields(
-                                    { name: 'Total Invites', value: `${inviterUserData.invites.total}`, inline: true },
-                                    { name: 'Regular Invites', value: `${inviterUserData.invites.regular}`, inline: true }
-                                )
-                                .setTimestamp();
-                            
-                            await inviter.send({ embeds: [embed] }).catch(() => {});
-                        }
-                    } catch (error) {
-                        logger.debug('Could not send DM to inviter');
-                    }
-                }
-            }
-            
+
+
+                
             // Update invite cache
             if (newInvites) {
                 client.invites.set(member.guild.id, new Map(newInvites.map(inv => [inv.code, inv.uses])));
