@@ -99,26 +99,26 @@ module.exports = {
         );
         
         const row3 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('panel_invite_add')
-                .setLabel('Add Invites')
-                .setStyle(ButtonStyle.Success)
-                .setEmoji('➕'),
-            new ButtonBuilder()
-                .setCustomId('panel_invite_edit')
-                .setLabel('Edit Invites')
-                .setStyle(ButtonStyle.Primary)
-                .setEmoji('✏️'),
-            new ButtonBuilder()
-                .setCustomId('panel_invite_leaderboard')
-                .setLabel('Invite Leaderboard')
-                .setStyle(ButtonStyle.Secondary)
-                .setEmoji('👥'),
-            new ButtonBuilder()
-                .setCustomId('panel_prefix_settings')
-                .setLabel('Change Prefix')
-                .setStyle(ButtonStyle.Primary)
-                .setEmoji('🔧')
+           new ButtonBuilder()
+              .setCustomId('panel_invite_add')
+              .setLabel('Add Invites')
+              .setStyle(ButtonStyle.Success)
+              .setEmoji('➕'),
+           new ButtonBuilder()
+               .setCustomId('panel_invite_edit')
+              .setLabel('Edit Invites')
+              .setStyle(ButtonStyle.Primary)
+              .setEmoji('✏️'),
+           new ButtonBuilder()
+              .setCustomId('panel_invite_leaderboard')
+              .setLabel('Invite Leaderboard')
+              .setStyle(ButtonStyle.Secondary)
+              .setEmoji('👥'),
+           new ButtonBuilder()
+              .setCustomId('panel_antispam_toggle')
+              .setLabel('Anti-Spam')
+              .setStyle(ButtonStyle.Primary)
+              .setEmoji('🛡️')
         );
         
         const row4 = new ActionRowBuilder().addComponents(
@@ -143,29 +143,6 @@ module.exports = {
                 .setStyle(ButtonStyle.Success)
                 .setEmoji('📝')
         );
-
-        const row3 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-        .setCustomId('panel_invite_add')
-        .setLabel('Add Invites')
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('➕'),
-    new ButtonBuilder()
-        .setCustomId('panel_invite_edit')
-        .setLabel('Edit Invites')
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('✏️'),
-    new ButtonBuilder()
-        .setCustomId('panel_invite_leaderboard')
-        .setLabel('Invite Leaderboard')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('👥'),
-    new ButtonBuilder()
-        .setCustomId('panel_antispam_toggle')
-        .setLabel('Anti-Spam')
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('🛡️')
-);
         
         await interaction.reply({ 
             embeds: [embed], 
