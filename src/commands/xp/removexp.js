@@ -32,7 +32,7 @@ module.exports = {
         if (!userData) {
             const errorEmbed = new PremiumEmbed()
                 .setError()
-                .setTitle('User Not Found')
+                .setTitle('❌ User Not Found')
                 .setDescription('This user has no XP data.');
             
             return interaction.editReply({ embeds: [errorEmbed] });
@@ -50,11 +50,12 @@ module.exports = {
         
         const embed = new PremiumEmbed()
             .setWarning()
-            .setTitle('XP Removed')
-            .setDescription(`Removed ${amount} XP from ${target.tag}`)
-            .addField('New XP', userData.xp.toString(), true)
-            .addField('Total XP', userData.totalXp.toString(), true)
-            .addField('Level', `${oldLevel} → ${newLevel}`, true);
+            .setTitle('⬇️ XP Removed')
+            .setDescription(`Removed **${amount}** XP from ${target.tag}`)
+            .addField('📊 New XP', userData.xp.toLocaleString(), true)
+            .addField('💫 Total XP', userData.totalXp.toLocaleString(), true)
+            .addField('📈 Level', `${oldLevel} → ${newLevel}`, true)
+            .setThumbnail(target.displayAvatarURL({ dynamic: true }));
         
         await interaction.editReply({ embeds: [embed] });
     }
