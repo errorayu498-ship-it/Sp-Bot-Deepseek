@@ -5,8 +5,10 @@ const { logger } = require('../utils/logger');
 const { EmbedBuilder } = require('discord.js');
 
 const cooldowns = new Map();
-const XP_PER_MESSAGE = 5;
-const XP_COOLDOWN = 60000; // 1 minute
+const messageCache = new Map(); // For spam detection
+const XP_COOLDOWN = 2000; // 2 seconds
+const SPAM_WARN_THRESHOLD = 3;
+
 const prefixCache = new Map();
 
 async function getGuildPrefix(guildId) {
@@ -47,14 +49,17 @@ module.exports = {
             guildData = new Guild({ 
                 guildId: message.guild.id, 
                 name: message.guild.name,
-                settings: { prefix: '!' }
+                settings: { 
+                    prefix: '!',
+                    antiSpamEnabled: true 
+                }
             });
             await guildData.save();
         }
         
         const prefix = guildData.settings.prefix || '!';
 
-        // Handle prefix commands - Fixed!
+        // Handle prefix commands
         if (message.content.startsWith(prefix)) {
             const args = message.content.slice(prefix.length).trim().split(/ +/);
             const commandName = args.shift().toLowerCase();
@@ -98,6 +103,8 @@ module.exports = {
                 await handleHelpCommand(message, prefix, guildData);
                 return;
             }
+            
+            return;
         }
 
         // XP System - Only in specific channel if set
@@ -111,6 +118,52 @@ module.exports = {
                 }
             }
             
+            // Anti-spam check
+            if (guildData.settings.antiSpamEnabled && xpChannelId && message.channel.id === xpChannelId) {
+                const spamKey = `${message.guild.id}-${message.author.id}`;
+                const userMessages = messageCache.get(spamKey) || [];
+                
+                // Add current message
+                userMessages.push({
+                    content: message.content,
+                    timestamp: Date.now()
+                });
+                
+                // Keep only last 10 messages
+                if (userMessages.length > 10) {
+                    userMessages.shift();
+                }
+                
+                messageCache.set(spamKey, userMessages);
+                
+                // Check for repeated messages
+                const recentMessages = userMessages.filter(m => Date.now() - m.timestamp < 10000);
+                const sameContent = recentMessages.filter(m => m.content === message.content);
+                
+                if (sameContent.length >= SPAM_WARN_THRESHOLD) {
+                    // Delete the spam message
+                    await message.delete().catch(() => {});
+                    
+                    // Send warning
+                    const warnEmbed = new PremiumEmbed()
+                        .setError()
+                        .setTitle('⚠️ Spam Warning')
+                        .setDescription(`${message.author}, please do not spam the same message!`)
+                        .addField('Warning', `You have sent the same message ${sameContent.length} times.`)
+                        .setFooter({ text: 'Repeated spamming may result in XP loss or mute' });
+                    
+                    const warnMsg = await message.channel.send({ 
+                        content: `${message.author}`,
+                        embeds: [warnEmbed] 
+                    });
+                    
+                    // Auto-delete warning after 5 seconds
+                    setTimeout(() => warnMsg.delete().catch(() => {}), 5000);
+                    
+                    return; // No XP for spam
+                }
+            }
+            
             // Check cooldown
             const cooldownKey = `${message.guild.id}-${message.author.id}`;
             const now = Date.now();
@@ -120,7 +173,7 @@ module.exports = {
                 if (now < cooldownTime) return;
             }
             
-            cooldowns.set(cooldownKey, now + (guildData.settings.xpCooldown * 1000 || XP_COOLDOWN));
+            cooldowns.set(cooldownKey, now + XP_COOLDOWN);
             
             try {
                 let userData = await User.findOne({ 
@@ -136,7 +189,7 @@ module.exports = {
                 }
                 
                 const oldLevel = userData.level;
-                const xpAmount = guildData.settings.xpPerMessage || XP_PER_MESSAGE;
+                const xpAmount = guildData.settings.xpPerMessage || 5;
                 
                 userData.xp += xpAmount;
                 userData.totalXp += xpAmount;
@@ -250,18 +303,63 @@ async function handleXpCommand(message, args, client, guildData) {
 }
 
 async function handleCheckXpCommand(message, args, client, guildData) {
-    const target = message.mentions.users.first();
-    
-    if (!target) {
-        const embed = new PremiumEmbed()
-            .setError()
-            .setTitle('❌ Invalid Usage')
-            .setDescription(`Please mention a user!\nExample: \`${guildData.settings.prefix}checkxp @user\``);
+    try {
+        const target = message.mentions.users.first();
         
-        return message.reply({ embeds: [embed] });
+        if (!target) {
+            const embed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Invalid Usage')
+                .setDescription(`Please mention a user!\nExample: \`${guildData.settings.prefix}checkxp @user\``);
+            
+            return message.reply({ embeds: [embed] });
+        }
+        
+        const userData = await User.findOne({ 
+            userId: target.id, 
+            guildId: message.guild.id 
+        });
+        
+        if (!userData) {
+            const embed = new PremiumEmbed()
+                .setInfo()
+                .setTitle('📊 XP Status')
+                .setDescription(`${target} hasn't earned any XP yet!`)
+                .setThumbnail(target.displayAvatarURL({ dynamic: true }));
+            
+            return message.reply({ embeds: [embed] });
+        }
+        
+        const xpNeeded = Math.pow((userData.level + 1) / 0.1, 2) - userData.totalXp;
+        const currentLevelXp = Math.pow(userData.level / 0.1, 2);
+        const nextLevelXp = Math.pow((userData.level + 1) / 0.1, 2);
+        const progress = ((userData.totalXp - currentLevelXp) / (nextLevelXp - currentLevelXp)) * 100;
+        
+        const barLength = 20;
+        const filledLength = Math.floor((progress / 100) * barLength);
+        const progressBar = '█'.repeat(filledLength) + '░'.repeat(barLength - filledLength);
+        
+        const embed = new PremiumEmbed()
+            .setTitle(`📊 XP Card - ${target.username}`)
+            .setThumbnail(target.displayAvatarURL({ dynamic: true }))
+            .addField('📈 Level', `${userData.level}`, true)
+            .addField('✨ Current XP', `${userData.xp.toLocaleString()}`, true)
+            .addField('💫 Total XP', `${userData.totalXp.toLocaleString()}`, true)
+            .addField('💬 Messages', `${userData.messages.toLocaleString()}`, true)
+            .addField('📊 Progress', `${progressBar} ${progress.toFixed(1)}%`, false)
+            .addField('⬆️ XP to Next Level', `${Math.floor(xpNeeded).toLocaleString()}`, true)
+            .setFooter({ text: `Requested by ${message.author.username}` });
+        
+        await message.reply({ embeds: [embed] });
+        
+    } catch (error) {
+        logger.error('CheckXP Command Error:', error);
+        const errorEmbed = new PremiumEmbed()
+            .setError()
+            .setTitle('❌ Error')
+            .setDescription('An error occurred while fetching XP data.');
+        await message.reply({ embeds: [errorEmbed] });
     }
-    
-    await handleXpCommand(message, [target.id], client, guildData);
 }
 
 async function handleLeaderboardCommand(message, args, client, guildData) {
