@@ -6,9 +6,9 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('addxp')
         .setDescription('Add XP to a user')
-        .addUserOption(option =>
-            option.setName('user')
-                .setDescription('The user to add XP to')
+        .addStringOption(option =>
+            option.setName('userid')
+                .setDescription('The User ID to add XP to')
                 .setRequired(true))
         .addIntegerOption(option =>
             option.setName('amount')
@@ -22,21 +22,32 @@ module.exports = {
     async execute(interaction) {
         await interaction.deferReply({ ephemeral: true });
         
-        const target = interaction.options.getUser('user');
+        const userId = interaction.options.getString('userid');
         const amount = interaction.options.getInteger('amount');
         
         try {
-            // Use findOneAndUpdate with upsert to avoid duplicate key errors
+            // Try to fetch user
+            const target = await interaction.client.users.fetch(userId).catch(() => null);
+            
+            if (!target) {
+                const errorEmbed = new PremiumEmbed()
+                    .setError()
+                    .setTitle('❌ Invalid User ID')
+                    .setDescription('Could not find a user with that ID.');
+                
+                return interaction.editReply({ embeds: [errorEmbed] });
+            }
+            
             const userData = await User.findOneAndUpdate(
-                { userId: target.id, guildId: interaction.guild.id },
+                { userId: userId, guildId: interaction.guild.id },
                 { 
-                    $setOnInsert: { 
-                        userId: target.id, 
-                        guildId: interaction.guild.id 
-                    },
                     $inc: { 
                         xp: amount,
                         totalXp: amount 
+                    },
+                    $setOnInsert: { 
+                        userId: userId, 
+                        guildId: interaction.guild.id 
                     }
                 },
                 { 
@@ -46,7 +57,6 @@ module.exports = {
                 }
             );
             
-            // Recalculate level
             const newLevel = Math.floor(0.1 * Math.sqrt(userData.totalXp));
             const oldLevel = userData.level;
             
@@ -59,6 +69,8 @@ module.exports = {
                 .setSuccess()
                 .setTitle('✅ XP Added')
                 .setDescription(`Added **${amount}** XP to ${target.tag}`)
+                .addField('👤 User', `${target}`, true)
+                .addField('🆔 User ID', userId, true)
                 .addField('📊 New XP', userData.xp.toLocaleString(), true)
                 .addField('💫 Total XP', userData.totalXp.toLocaleString(), true)
                 .addField('📈 Level', `${oldLevel} → ${newLevel}`, true)
