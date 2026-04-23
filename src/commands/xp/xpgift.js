@@ -11,8 +11,8 @@ module.exports = {
             option.setName('xp_amount')
                 .setDescription('Amount of XP to gift')
                 .setRequired(true)
-                .setMinValue(100)
-                .setMaxValue(100000))
+                .setMinValue(1)
+                .setMaxValue(99999999))
         .addStringOption(option =>
             option.setName('user_id')
                 .setDescription('Specific user ID who can claim (optional - leave empty for anyone)')
@@ -60,9 +60,9 @@ module.exports = {
         // Create claim button
         const claimButton = new ButtonBuilder()
             .setCustomId(`xpgift_claim_${giftId}`)
-            .setLabel('🎁 Claim XP')
+            .setLabel('Claim XP')
             .setStyle(ButtonStyle.Success)
-            .setEmoji('⚡');
+            .setEmoji('🎁');
         
         const row = new ActionRowBuilder().addComponents(claimButton);
         
