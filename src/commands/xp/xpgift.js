@@ -12,10 +12,10 @@ module.exports = {
                 .setDescription('Amount of XP to gift')
                 .setRequired(true)
                 .setMinValue(1)
-                .setMaxValue(99999999))
+                .setMaxValue(999999))
         .addStringOption(option =>
             option.setName('user_id')
-                .setDescription('Specific user ID who can claim (optional - leave empty for anyone)')
+                .setDescription('Specific user ID who can claim (optional)')
                 .setRequired(false)),
     
     adminOnly: true,
@@ -27,20 +27,22 @@ module.exports = {
         const specificUserId = interaction.options.getString('user_id');
         
         // Generate unique gift ID
-        const giftId = Math.floor(1000 + Math.random() * 9000).toString();
+        const giftId = Math.floor(10000 + Math.random() * 90000).toString();
         
-        let restrictedTo = 'Anyone';
+        let restrictedTo = 'Anyone can claim';
         let targetUser = null;
         
-        if (specificUserId) {
+        if (specificUserId && specificUserId.trim()) {
             try {
-                targetUser = await interaction.client.users.fetch(specificUserId);
-                restrictedTo = `${targetUser.tag}`;
+                targetUser = await interaction.client.users.fetch(specificUserId.trim());
+                if (targetUser) {
+                    restrictedTo = `${targetUser.tag} only`;
+                }
             } catch (error) {
                 const errorEmbed = new PremiumEmbed()
                     .setError()
                     .setTitle('❌ Invalid User ID')
-                    .setDescription('Could not find a user with that ID. Make sure the ID is correct.');
+                    .setDescription('Could not find a user with that ID.');
                 
                 return interaction.editReply({ embeds: [errorEmbed] });
             }
@@ -51,7 +53,7 @@ module.exports = {
             .setTitle('🎁 XP Gift Drop!')
             .setDescription(`A wild XP gift has appeared! Be the first to claim it!`)
             .addField('✨ XP Amount', `**${xpAmount.toLocaleString()}** XP`, true)
-            .addField('🎯 Restricted To', `${restrictedTo}`, true)
+            .addField('🎯 Who Can Claim', restrictedTo, true)
             .addField('📊 Status', '🟢 Available', true)
             .addField('💡 How to Claim', 'Click the **Claim XP** button below!\nFirst come, first served!')
             .setFooter({ text: `Gift ID: ${giftId} • Created by ${interaction.user.tag}` })
@@ -60,9 +62,9 @@ module.exports = {
         // Create claim button
         const claimButton = new ButtonBuilder()
             .setCustomId(`xpgift_claim_${giftId}`)
-            .setLabel('Claim XP')
+            .setLabel('🎁 Claim XP')
             .setStyle(ButtonStyle.Success)
-            .setEmoji('🎁');
+            .setEmoji('⚡');
         
         const row = new ActionRowBuilder().addComponents(claimButton);
         
@@ -72,69 +74,55 @@ module.exports = {
             components: [row]
         });
         
-        // Store gift data in database
-        const giftData = new Giveaway({
-            giveawayId: `xpgift_${giftId}`,
-            guildId: interaction.guild.id,
-            channelId: interaction.channel.id,
-            messageId: giftMessage.id,
-            prize: `XP Gift - ${xpAmount} XP`,
-            winners: 1,
-            hostId: interaction.user.id,
-            requirements: {
-                xp: 0,
-                invites: 0,
-                role: null
-            },
-            entries: [],
-            winnersList: [],
-            startTime: new Date(),
-            endTime: new Date(Date.now() + 604800000), // 7 days
-            status: 'active',
-            rerollCount: 0,
-            xpGiftData: {
-                xpAmount: xpAmount,
-                specificUserId: specificUserId || null,
-                claimed: false,
-                claimedBy: null,
-                claimedAt: null
-            }
-        });
-        
-        await giftData.save();
-        
-        // Create button collector for the gift
+        // Create collector for the button
         const collector = giftMessage.createMessageComponentCollector({ 
             filter: i => i.customId === `xpgift_claim_${giftId}`,
             time: 604800000 // 7 days
         });
         
         collector.on('collect', async (i) => {
-            // Check if already claimed
-            const updatedGift = await Giveaway.findOne({ giveawayId: `xpgift_${giftId}` });
-            
-            if (!updatedGift || updatedGift.xpGiftData.claimed) {
-                return i.reply({ 
-                    content: 'This XP gift has already been claimed!', 
-                    ephemeral: true 
-                });
-            }
-            
             // Check if restricted to specific user
-            if (specificUserId && i.user.id !== specificUserId) {
+            if (specificUserId && specificUserId.trim() && i.user.id !== specificUserId.trim()) {
                 const restrictedEmbed = new PremiumEmbed()
                     .setError()
                     .setTitle('❌ Access Denied')
-                    .setDescription(`This XP gift is reserved for ${targetUser.tag} only!`);
+                    .setDescription(`This XP gift is reserved for ${targetUser?.tag || specificUserId} only!`);
                 
                 return i.reply({ embeds: [restrictedEmbed], ephemeral: true });
             }
             
-            // Defer reply to prevent interaction timeout
-            await i.deferUpdate();
+            // Defer immediately
+            await i.deferUpdate().catch(() => {});
             
             try {
-                // Get claimer's current XP data
+                // Get current state from database
+                const giftData = await Giveaway.findOne({ 
+                    giveawayId: `xpgift_${giftId}`,
+                    status: 'active'
+                });
+                
+                if (!giftData || (giftData.xpGiftData && giftData.xpGiftData.claimed)) {
+                    // Update UI to show claimed
+                    const claimedEmbed = new PremiumEmbed()
+                        .setWarning()
+                        .setTitle('🎁 Already Claimed!')
+                        .setDescription('This XP gift has already been claimed!');
+                    
+                    const disabledButton = new ButtonBuilder()
+                        .setCustomId('xpgift_claimed')
+                        .setLabel('Already Claimed')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(true)
+                        .setEmoji('✅');
+                    
+                    const disabledRow = new ActionRowBuilder().addComponents(disabledButton);
+                    
+                    await giftMessage.edit({ embeds: [claimedEmbed], components: [disabledRow] });
+                    
+                    return i.followUp({ content: 'This gift has already been claimed!', ephemeral: true });
+                }
+                
+                // Get claimer's current XP
                 let claimerData = await User.findOne({ 
                     userId: i.user.id, 
                     guildId: interaction.guild.id 
@@ -144,18 +132,19 @@ module.exports = {
                 const beforeTotalXp = claimerData?.totalXp || 0;
                 const beforeLevel = claimerData?.level || 1;
                 
-                // Update or create user data
+                // Update or create user
                 if (!claimerData) {
                     claimerData = new User({
                         userId: i.user.id,
                         guildId: interaction.guild.id,
                         xp: xpAmount,
                         totalXp: xpAmount,
-                        level: Math.floor(0.1 * Math.sqrt(xpAmount))
+                        level: Math.floor(0.1 * Math.sqrt(xpAmount)),
+                        messages: 0
                     });
                 } else {
-                    claimerData.xp += xpAmount;
-                    claimerData.totalXp += xpAmount;
+                    claimerData.xp = (claimerData.xp || 0) + xpAmount;
+                    claimerData.totalXp = (claimerData.totalXp || 0) + xpAmount;
                     claimerData.level = Math.floor(0.1 * Math.sqrt(claimerData.totalXp));
                 }
                 
@@ -166,22 +155,28 @@ module.exports = {
                 const afterLevel = claimerData.level;
                 
                 // Update gift data
-                updatedGift.xpGiftData.claimed = true;
-                updatedGift.xpGiftData.claimedBy = i.user.id;
-                updatedGift.xpGiftData.claimedAt = new Date();
-                updatedGift.status = 'ended';
-                updatedGift.entries.push({
+                giftData.status = 'ended';
+                giftData.xpGiftData = {
+                    ...giftData.xpGiftData,
+                    claimed: true,
+                    claimedBy: i.user.id,
+                    claimedAt: new Date()
+                };
+                giftData.entries.push({
                     userId: i.user.id,
                     username: i.user.username,
                     joinedAt: new Date()
                 });
-                updatedGift.winnersList.push({
+                giftData.winnersList.push({
                     userId: i.user.id,
                     username: i.user.username,
                     announcedAt: new Date()
                 });
                 
-                await updatedGift.save();
+                await giftData.save();
+                
+                // Stop collector
+                collector.stop('claimed');
                 
                 // Create claimed embed
                 const claimedEmbed = new PremiumEmbed()
@@ -216,7 +211,7 @@ module.exports = {
                     components: [disabledRow] 
                 });
                 
-                // Send claim confirmation message
+                // Send public confirmation
                 const confirmEmbed = new PremiumEmbed()
                     .setSuccess()
                     .setTitle('✅ XP Gift Claimed Successfully!')
@@ -236,46 +231,20 @@ module.exports = {
                     embeds: [confirmEmbed] 
                 });
                 
-                // Log the claim if log channel is set
-                const Guild = require('../../models/Guild');
-                const guildData = await Guild.findOne({ guildId: interaction.guild.id });
-                
-                if (guildData?.settings?.logChannel) {
-                    const { EmbedBuilder } = require('discord.js');
-                    const logEmbed = new EmbedBuilder()
-                        .setColor(0x00FF00)
-                        .setTitle('🎁 XP Gift Claimed - Log')
-                        .setDescription(`An XP gift was claimed!`)
-                        .addFields(
-                            { name: 'Claimed By', value: `${i.user.tag}`, inline: true },
-                            { name: 'User ID', value: i.user.id, inline: true },
-                            { name: 'XP Amount', value: `${xpAmount.toLocaleString()}`, inline: true },
-                            { name: 'Gift ID', value: giftId, inline: true },
-                            { name: 'Created By', value: `${interaction.user.tag}`, inline: true }
-                        )
-                        .setTimestamp();
-                    
-                    const logChannel = await interaction.guild.channels.fetch(guildData.settings.logChannel).catch(() => null);
-                    if (logChannel) {
-                        await logChannel.send({ embeds: [logEmbed] });
-                    }
-                }
-                
-                // Stop collector
-                collector.stop('claimed');
-                
             } catch (error) {
                 console.error('XP Gift Claim Error:', error);
                 
-                const errorEmbed = new PremiumEmbed()
-                    .setError()
-                    .setTitle('❌ Claim Failed')
-                    .setDescription('An error occurred while claiming the XP gift. Please try again.');
-                
-                await interaction.channel.send({ 
-                    content: `${i.user}`,
-                    embeds: [errorEmbed] 
-                });
+                // Try to update UI even if error
+                try {
+                    const errorEmbed = new PremiumEmbed()
+                        .setError()
+                        .setTitle('❌ Claim Failed')
+                        .setDescription('An error occurred. Please try again.');
+                    
+                    await i.followUp({ embeds: [errorEmbed], ephemeral: true });
+                } catch (e) {
+                    // Ignore follow-up errors
+                }
             }
         });
         
@@ -307,7 +276,7 @@ module.exports = {
                 await Giveaway.findOneAndUpdate(
                     { giveawayId: `xpgift_${giftId}` },
                     { $set: { status: 'cancelled' } }
-                );
+                ).catch(() => {});
             }
         });
     }
