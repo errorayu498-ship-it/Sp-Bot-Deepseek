@@ -107,13 +107,13 @@ module.exports = {
             return;
         }
 
-        // XP System - Everyone gets XP in XP channel
+        // XP System - SAB KO XP DENA HAI (Including Admin)
         if (guildData.settings.xpEnabled) {
             const xpChannelId = guildData.settings.xpChannel;
             
-            // If XP channel is set, only give XP in that specific channel
+            // Agar XP channel set hai to sirf usi channel mein XP milega
             if (xpChannelId && message.channel.id !== xpChannelId) {
-                return; // Not the XP channel, no XP given
+                return;
             }
             
             // Anti-spam check
@@ -156,7 +156,7 @@ module.exports = {
                 }
             }
             
-            // Check cooldown
+            // Check cooldown - SAB KE LIYE SAME COOLDOWN
             const cooldownKey = `${message.guild.id}-${message.author.id}`;
             const now = Date.now();
             
@@ -168,9 +168,9 @@ module.exports = {
             cooldowns.set(cooldownKey, now + XP_COOLDOWN);
             
             try {
-                // Use findOneAndUpdate to avoid race conditions and ensure everyone gets XP
                 const xpAmount = guildData.settings.xpPerMessage || 5;
                 
+                // SAB KO XP DO - KOI RESTRICTION NAHI
                 const result = await User.findOneAndUpdate(
                     { userId: message.author.id, guildId: message.guild.id },
                     { 
@@ -387,8 +387,10 @@ async function handleLeaderboardCommand(message, args, client, guildData) {
             const user = users[i];
             const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
             
-            // Use mention format
-            leaderboardText += `${medal} <@${user.userId}>\n`;
+            const member = await message.guild.members.fetch(user.userId).catch(() => null);
+            const username = member?.user?.username || 'Unknown User';
+            
+            leaderboardText += `${medal} <@${user.userId}> (${username})\n`;
             leaderboardText += `   └ Level ${user.level} • ${user.totalXp.toLocaleString()} XP\n\n`;
             
             if (user.userId === message.author.id) {
@@ -449,11 +451,6 @@ async function handleInviteCommand(message, args, client, guildData) {
         
     } catch (error) {
         logger.error('Invite Command Error:', error);
-        const errorEmbed = new PremiumEmbed()
-            .setError()
-            .setTitle('❌ Error')
-            .setDescription('An error occurred while fetching invite data.');
-        await message.reply({ embeds: [errorEmbed] });
     }
 }
 
@@ -503,7 +500,10 @@ async function handleInviteLeaderboardCommand(message, args, client, guildData) 
             hasInvites = true;
             const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
             
-            leaderboardText += `${medal} <@${user.userId}>\n`;
+            const member = await message.guild.members.fetch(user.userId).catch(() => null);
+            const username = member?.user?.username || 'Unknown User';
+            
+            leaderboardText += `${medal} <@${user.userId}> (${username})\n`;
             leaderboardText += `   └ ${user.invites.total} invites (${user.invites.regular} regular, ${user.invites.bonus} bonus)\n\n`;
             
             if (user.userId === message.author.id) {
@@ -527,17 +527,12 @@ async function handleInviteLeaderboardCommand(message, args, client, guildData) 
         
     } catch (error) {
         logger.error('Invite Leaderboard Error:', error);
-        const errorEmbed = new PremiumEmbed()
-            .setError()
-            .setTitle('❌ Error')
-            .setDescription('An error occurred while fetching invite leaderboard.');
-        await message.reply({ embeds: [errorEmbed] });
     }
 }
 
 async function handleHelpCommand(message, prefix, guildData) {
     const embed = new PremiumEmbed()
-        .setTitle('📚 Bot Commands Help')
+        .setTitle('Saraiki Bot Commands')
         .setDescription(`Here are all available public commands! Prefix: \`${prefix}\``)
         .addField('📊 XP Commands',
             `\`${prefix}xp\` - Check your XP and level\n` +
@@ -555,7 +550,7 @@ async function handleHelpCommand(message, prefix, guildData) {
         .addField('ℹ️ Other Commands',
             `\`${prefix}help\` - Show this help menu`
         )
-        .setFooter({ text: `Made with ❤️ • Current Prefix: ${prefix}` });
+        .setFooter({ text: `Made By Subhan • Current Prefix: ${prefix}` });
     
     await message.reply({ embeds: [embed] });
 }
