@@ -62,9 +62,9 @@ module.exports = {
         // Create claim button
         const claimButton = new ButtonBuilder()
             .setCustomId(`xpgift_claim_${giftId}`)
-            .setLabel('🎁 Claim XP')
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('⚡');
+            .setLabel('Claim XP')
+            .setStyle(ButtonStyle.Success);
+            
         
         const row = new ActionRowBuilder().addComponents(claimButton);
         
