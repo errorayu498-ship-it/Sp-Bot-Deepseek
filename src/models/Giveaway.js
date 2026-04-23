@@ -30,7 +30,14 @@ const giveawaySchema = new mongoose.Schema({
         enum: ['active', 'ended', 'cancelled'], 
         default: 'active' 
     },
-    rerollCount: { type: Number, default: 0 }
+    rerollCount: { type: Number, default: 0 },
+    xpGiftData: {
+        xpAmount: { type: Number, default: 0 },
+        specificUserId: { type: String, default: null },
+        claimed: { type: Boolean, default: false },
+        claimedBy: { type: String, default: null },
+        claimedAt: { type: Date, default: null }
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Giveaway', giveawaySchema);
