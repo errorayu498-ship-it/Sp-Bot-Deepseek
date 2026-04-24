@@ -64,25 +64,8 @@ module.exports = {
                     
                     logger.info(`${member.user.username} was invited by ${usedInvite.inviter.username}`);
                     
-                    // Send DM to inviter
-                    try {
-                        const inviter = await member.guild.members.fetch(inviterId);
-                        if (inviter) {
-                            const embed = new EmbedBuilder()
-                                .setColor(0x00FF00)
-                                .setTitle('🎉 New Member Invited!')
-                                .setDescription(`${member.user} joined using your invite!`)
-                                .addFields(
-                                    { name: 'Total Invites', value: `${inviterUserData.invites.total}`, inline: true },
-                                    { name: 'Regular Invites', value: `${inviterUserData.invites.regular}`, inline: true }
-                                )
-                                .setTimestamp();
-                            
-                            await inviter.send({ embeds: [embed] }).catch(() => {});
-                        }
-                    } catch (error) {
-                        logger.debug('Could not send DM to inviter');
-                    }
+                    // ❌ DM TO INVITER REMOVED - NO MORE DM SPAM
+                    // Ab koi DM nahi bheja jayega inviter ko
                 }
             }
             
@@ -91,7 +74,7 @@ module.exports = {
                 client.invites.set(member.guild.id, new Map(newInvites.map(inv => [inv.code, inv.uses])));
             }
             
-            // Send invite log
+            // Send invite log - Sirf log channel mein message
             if (guildData?.settings?.inviteLogChannel) {
                 const logEmbed = new EmbedBuilder()
                     .setColor(0x00FF00)
@@ -127,7 +110,7 @@ module.exports = {
                 await sendLog(member.guild, guildData.settings.inviteLogChannel, logEmbed);
             }
             
-            // Send general log
+            // Send general log - Server join log
             if (guildData?.settings?.logChannel) {
                 const logEmbed = new EmbedBuilder()
                     .setColor(0x00FF00)
@@ -136,9 +119,17 @@ module.exports = {
                     .addFields(
                         { name: 'User', value: `${member.user.tag}`, inline: true },
                         { name: 'ID', value: member.id, inline: true },
-                        { name: 'Total Members', value: `${member.guild.memberCount}`, inline: true }
-                    )
-                    .setTimestamp();
+                        { name: 'Total Members', value: `${member.guild.memberCount}`, inline: true },
+                        { name: 'Account Age', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true }
+                    );
+                
+                if (usedInvite && usedInvite.inviter) {
+                    logEmbed.addFields(
+                        { name: 'Invited By', value: `${usedInvite.inviter.tag} (${usedInvite.inviter.id})`, inline: true }
+                    );
+                }
+                
+                logEmbed.setTimestamp();
                 
                 await sendLog(member.guild, guildData.settings.logChannel, logEmbed);
             }
