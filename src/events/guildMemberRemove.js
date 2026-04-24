@@ -22,12 +22,6 @@ module.exports = {
         try {
             const guildData = await Guild.findOne({ guildId: member.guild.id });
             
-            // Update inviter's stats (mark as left)
-            const userData = await User.findOne({ 
-                userId: member.id, 
-                guildId: member.guild.id 
-            });
-            
             // Find who invited this user
             const inviterData = await User.findOne({
                 guildId: member.guild.id,
@@ -44,10 +38,13 @@ module.exports = {
                     inviterData.invites.leaves += 1;
                     
                     await inviterData.save();
+                    
+                    // ❌ NO DM TO INVITER WHEN MEMBER LEAVES
+                    // Sirf log channel mein message jayega
                 }
             }
             
-            // Send leave log
+            // Send leave log to general log channel
             if (guildData?.settings?.logChannel) {
                 const logEmbed = new EmbedBuilder()
                     .setColor(0xFF0000)
@@ -65,7 +62,8 @@ module.exports = {
                     const inviter = await client.users.fetch(inviterData.userId).catch(() => null);
                     if (inviter) {
                         logEmbed.addFields(
-                            { name: 'Invited By', value: inviter.tag, inline: true }
+                            { name: 'Invited By', value: `${inviter.tag}`, inline: true },
+                            { name: 'Inviter Current Invites', value: `${inviterData.invites.total}`, inline: true }
                         );
                     }
                 }
