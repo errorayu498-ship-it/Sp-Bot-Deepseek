@@ -38,6 +38,16 @@ async function sendLog(guild, channelId, embed) {
     }
 }
 
+function isUserStaff(guildData, member, adminRole) {
+    // Check admin first
+    if (adminRole && member.roles.cache.has(adminRole)) return true;
+    
+    // Check staff list
+    if (guildData.staff?.some(s => s.userId === member.id)) return true;
+    
+    return false;
+}
+
 module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
@@ -55,12 +65,14 @@ module.exports = {
                     xpEnabled: true,
                     xpPerMessage: 5
                 },
-                blacklist: []
+                blacklist: [],
+                staff: []
             });
             await guildData.save();
         }
         
         const prefix = guildData.settings.prefix || '!';
+        const adminRole = process.env.ADMIN_ROLE_ID;
 
         // Handle prefix commands
         if (message.content.startsWith(prefix)) {
@@ -75,14 +87,27 @@ module.exports = {
                     .setTitle('🚫 Access Denied')
                     .setDescription('You are blacklisted and cannot use bot commands!')
                     .addField('Reason', 'You have been restricted from using bot features.')
-                    .setFooter({ text: 'Contact an Subhan for more information.' });
+                    .setFooter({ text: 'Contact an admin for more information.' });
                 
                 return message.reply({ embeds: [blacklistEmbed] });
             }
             
             logger.info(`Prefix command used: ${commandName} by ${message.author.tag}`);
             
-            // XP Commands
+            // ==================== STAFF COMMANDS ====================
+            
+            if (commandName === 'delmsg') {
+                await handleStaffDelMsg(message, args, client, guildData, adminRole);
+                return;
+            }
+            
+            if (commandName === 'timeout') {
+                await handleStaffTimeout(message, args, client, guildData, adminRole);
+                return;
+            }
+            
+            // ==================== PUBLIC XP COMMANDS ====================
+            
             if (commandName === 'xp') {
                 await handleXpCommand(message, args, client, guildData);
                 return;
@@ -98,7 +123,8 @@ module.exports = {
                 return;
             }
             
-            // Invite Commands
+            // ==================== PUBLIC INVITE COMMANDS ====================
+            
             if (commandName === 'invite' || commandName === 'invites') {
                 await handleInviteCommand(message, args, client, guildData);
                 return;
@@ -114,7 +140,8 @@ module.exports = {
                 return;
             }
             
-            // Help Command
+            // ==================== HELP COMMAND ====================
+            
             if (commandName === 'help') {
                 await handleHelpCommand(message, prefix, guildData);
                 return;
@@ -123,7 +150,8 @@ module.exports = {
             return;
         }
 
-        // XP System - Blacklist check ke saath
+        // ==================== XP SYSTEM ====================
+        
         if (guildData.settings.xpEnabled) {
             // ✅ BLACKLIST CHECK - Agar user blacklisted hai to XP nahi milega
             const isBlacklisted = guildData.blacklist?.some(b => b.userId === message.author.id);
@@ -271,7 +299,7 @@ module.exports = {
     }
 };
 
-// ==================== COMMAND HANDLERS ====================
+// ==================== PUBLIC COMMAND HANDLERS ====================
 
 async function handleXpCommand(message, args, client, guildData) {
     try {
@@ -555,9 +583,13 @@ async function handleInviteLeaderboardCommand(message, args, client, guildData) 
 }
 
 async function handleHelpCommand(message, prefix, guildData) {
+    // Check if user is staff
+    const isStaff = guildData.staff?.some(s => s.userId === message.author.id);
+    const isAdmin = message.member.roles.cache.has(process.env.ADMIN_ROLE_ID);
+    
     const embed = new PremiumEmbed()
         .setTitle('📚 Bot Commands Help')
-        .setDescription(`Here are all available public commands! Prefix: \`${prefix}\``)
+        .setDescription(`Here are all available commands! Prefix: \`${prefix}\``)
         .addField('📊 XP Commands',
             `\`${prefix}xp\` - Check your XP and level\n` +
             `\`${prefix}checkxp @user\` - Check someone's XP\n` +
@@ -570,8 +602,24 @@ async function handleHelpCommand(message, prefix, guildData) {
             `\`${prefix}checkinvite @user\` - Check someone's invites\n` +
             `\`${prefix}inviteleaderboard\` - View invite leaderboard\n` +
             `\`${prefix}ilb\` - Alias for inviteleaderboard`
-        )
-        .addField('ℹ️ Other Commands',
+        );
+    
+    // Staff commands section
+    if (isStaff || isAdmin) {
+        embed.addField('🔧 Staff Commands',
+            `\`${prefix}delmsg @user [amount]\` - Delete user messages\n` +
+            `\`${prefix}delmsg userID [amount]\` - Delete by ID\n` +
+            `\`${prefix}timeout @user duration\` - Timeout a member\n` +
+            `\`${prefix}timeout userID duration\` - Timeout by ID\n\n` +
+            `**Timeout Examples:**\n` +
+            `\`${prefix}timeout @user 10m\` - 10 minutes\n` +
+            `\`${prefix}timeout @user 1h\` - 1 hour\n` +
+            `\`${prefix}timeout @user 30s\` - 30 seconds\n` +
+            `Max timeout: 6 hours`
+        );
+    }
+    
+    embed.addField('ℹ️ Other Commands',
             `\`${prefix}help\` - Show this help menu`
         )
         .addField('💡 Tips',
@@ -579,7 +627,340 @@ async function handleHelpCommand(message, prefix, guildData) {
             '• Level up to unlock special features\n' +
             '• Invite friends to climb the invite leaderboard'
         )
-        .setFooter({ text: `Made By Subhan • Current Prefix: ${prefix}` });
+        .setFooter({ text: `Made with ❤️ • Current Prefix: ${prefix}` });
     
     await message.reply({ embeds: [embed] });
+}
+
+// ==================== STAFF COMMAND HANDLERS ====================
+
+async function handleStaffDelMsg(message, args, client, guildData, adminRole) {
+    try {
+        // Check if user is staff or admin
+        const isAllowed = isUserStaff(guildData, message.member, adminRole);
+        
+        if (!isAllowed) {
+            const embed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Permission Denied')
+                .setDescription('You need staff permissions to use this command!');
+            
+            return message.reply({ embeds: [embed] });
+        }
+        
+        // Check bot permissions
+        if (!message.guild.members.me.permissions.has('ManageMessages')) {
+            const embed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Missing Permissions')
+                .setDescription('Bot needs **Manage Messages** permission!');
+            
+            return message.reply({ embeds: [embed] });
+        }
+        
+        let targetUser = null;
+        let messageAmount = null;
+        
+        // Parse arguments - support both mention and ID
+        if (message.mentions.users.first()) {
+            targetUser = message.mentions.users.first();
+            // Check if there's an amount after mention
+            if (args.length > 1) {
+                messageAmount = parseInt(args[1]);
+            }
+        } else if (args[0]) {
+            // Try ID
+            targetUser = await client.users.fetch(args[0]).catch(() => null);
+            if (targetUser && args.length > 1) {
+                messageAmount = parseInt(args[1]);
+            }
+        }
+        
+        // Validate message amount
+        if (messageAmount !== null && (isNaN(messageAmount) || messageAmount < 1 || messageAmount > 100)) {
+            const guideEmbed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Invalid Amount')
+                .setDescription('Message amount must be between 1-100')
+                .addField('📝 Correct Usage',
+                    `\`${guildData.settings.prefix}delmsg @user [amount]\` - Delete specific amount\n` +
+                    `\`${guildData.settings.prefix}delmsg userID [amount]\` - Delete by ID\n` +
+                    `\`${guildData.settings.prefix}delmsg @user\` - Delete last 30 min messages`
+                );
+            
+            return message.reply({ embeds: [guideEmbed] });
+        }
+        
+        if (!targetUser) {
+            const guideEmbed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ User Required')
+                .setDescription('Please mention a user or provide their ID!')
+                .addField('📝 Usage',
+                    `\`${guildData.settings.prefix}delmsg @user [amount]\` - Delete messages\n` +
+                    `\`${guildData.settings.prefix}delmsg userID [amount]\` - Delete by ID`
+                );
+            
+            return message.reply({ embeds: [guideEmbed] });
+        }
+        
+        // Get messages
+        const fetchedMessages = await message.channel.messages.fetch({ limit: 100 });
+        
+        let messagesToDelete;
+        
+        if (messageAmount) {
+            // Delete specific amount
+            messagesToDelete = Array.from(fetchedMessages
+                .filter(msg => msg.author.id === targetUser.id)
+                .values())
+                .slice(0, messageAmount);
+        } else {
+            // Delete messages from last 30 minutes
+            const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+            messagesToDelete = Array.from(fetchedMessages
+                .filter(msg => msg.author.id === targetUser.id && msg.createdTimestamp > thirtyMinutesAgo)
+                .values());
+        }
+        
+        if (messagesToDelete.length === 0) {
+            const embed = new PremiumEmbed()
+                .setWarning()
+                .setTitle('⚠️ No Messages Found')
+                .setDescription(`No messages found from ${targetUser.tag} to delete.\n${messageAmount ? 'Try a lower amount.' : 'No messages in the last 30 minutes.'}`);
+            
+            return message.reply({ embeds: [embed] });
+        }
+        
+        // Delete messages
+        const deleted = await message.channel.bulkDelete(messagesToDelete, true);
+        
+        // Send confirmation embed
+        const confirmEmbed = new PremiumEmbed()
+            .setSuccess()
+            .setTitle('🗑️ Messages Deleted')
+            .setDescription(`Successfully deleted messages!`)
+            .addField('👤 Target User', `${targetUser.tag}`, true)
+            .addField('🆔 User ID', targetUser.id, true)
+            .addField('📊 Deleted', `${deleted.size} messages`, true)
+            .addField('📺 Channel', `${message.channel}`, true)
+            .addField('👮 Staff', `${message.author.tag}`, true)
+            .addField('⏰ Filter', messageAmount ? `Last ${messageAmount} messages` : 'Last 30 minutes', true)
+            .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+            .setFooter({ text: `Action by ${message.author.tag}` })
+            .setTimestamp();
+        
+        const replyMsg = await message.channel.send({ embeds: [confirmEmbed] });
+        
+        // Auto delete confirmation after 10 seconds
+        setTimeout(() => replyMsg.delete().catch(() => {}), 10000);
+        
+        // Log
+        if (guildData.settings?.logChannel) {
+            const logEmbed = new EmbedBuilder()
+                .setColor(0xFFA500)
+                .setTitle('🗑️ Messages Bulk Deleted')
+                .addFields(
+                    { name: 'Target User', value: `${targetUser.tag}`, inline: true },
+                    { name: 'User ID', value: targetUser.id, inline: true },
+                    { name: 'Deleted', value: `${deleted.size} messages`, inline: true },
+                    { name: 'Channel', value: `${message.channel.name}`, inline: true },
+                    { name: 'Staff', value: `${message.author.tag}`, inline: true },
+                    { name: 'Filter', value: messageAmount ? `Last ${messageAmount}` : 'Last 30 min', inline: true }
+                )
+                .setTimestamp();
+            
+            await sendLog(message.guild, guildData.settings.logChannel, logEmbed);
+        }
+        
+    } catch (error) {
+        console.error('Staff DelMsg Error:', error);
+        
+        if (error.code === 50034) {
+            const embed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Error')
+                .setDescription('Can only bulk delete messages under 14 days old.');
+            return message.reply({ embeds: [embed] });
+        }
+        
+        const embed = new PremiumEmbed()
+            .setError()
+            .setTitle('❌ Error')
+            .setDescription('Failed to delete messages. Check bot permissions.');
+        await message.reply({ embeds: [embed] });
+    }
+}
+
+async function handleStaffTimeout(message, args, client, guildData, adminRole) {
+    try {
+        // Check if user is staff or admin
+        const isAllowed = isUserStaff(guildData, message.member, adminRole);
+        
+        if (!isAllowed) {
+            const embed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Permission Denied')
+                .setDescription('You need staff permissions to use this command!');
+            
+            return message.reply({ embeds: [embed] });
+        }
+        
+        // Check bot permissions
+        if (!message.guild.members.me.permissions.has('ModerateMembers')) {
+            const embed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Missing Permissions')
+                .setDescription('Bot needs **Moderate Members** permission to timeout users!');
+            
+            return message.reply({ embeds: [embed] });
+        }
+        
+        let targetMember = null;
+        let duration = null;
+        
+        // Parse arguments
+        if (message.mentions.members.first()) {
+            targetMember = message.mentions.members.first();
+            if (args.length > 1) {
+                duration = args[1];
+            }
+        } else if (args[0]) {
+            // Try ID
+            targetMember = await message.guild.members.fetch(args[0]).catch(() => null);
+            if (targetMember && args.length > 1) {
+                duration = args[1];
+            }
+        }
+        
+        // Show guide if wrong usage
+        if (!targetMember || !duration) {
+            const guideEmbed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Invalid Usage')
+                .setDescription('Please provide user and duration!')
+                .addField('📝 Correct Usage',
+                    `\`${guildData.settings.prefix}timeout @user duration\`\n` +
+                    `\`${guildData.settings.prefix}timeout userID duration\`\n\n` +
+                    `**Examples:**\n` +
+                    `\`${guildData.settings.prefix}timeout @user 1h\` - 1 hour\n` +
+                    `\`${guildData.settings.prefix}timeout @user 30m\` - 30 minutes\n` +
+                    `\`${guildData.settings.prefix}timeout @user 60s\` - 60 seconds\n` +
+                    `\`${guildData.settings.prefix}timeout @user 5m30s\` - 5 min 30 sec`
+                )
+                .addField('⏰ Duration Format',
+                    '• `s` = seconds (max 21600s = 6h)\n' +
+                    '• `m` = minutes (max 360m = 6h)\n' +
+                    '• `h` = hours (max 6h)\n' +
+                    '• Max timeout: 6 hours'
+                )
+                .setFooter({ text: guildData.settings.prefix + 'timeout @user 10m' });
+            
+            return message.reply({ embeds: [guideEmbed] });
+        }
+        
+        // Parse duration
+        let totalMs = 0;
+        const durationStr = duration.toLowerCase();
+        
+        // Parse hours
+        const hoursMatch = durationStr.match(/(\d+)h/);
+        if (hoursMatch) totalMs += parseInt(hoursMatch[1]) * 3600000;
+        
+        // Parse minutes
+        const minutesMatch = durationStr.match(/(\d+)m/);
+        if (minutesMatch) totalMs += parseInt(minutesMatch[1]) * 60000;
+        
+        // Parse seconds
+        const secondsMatch = durationStr.match(/(\d+)s/);
+        if (secondsMatch) totalMs += parseInt(secondsMatch[1]) * 1000;
+        
+        // Validate duration
+        if (totalMs <= 0) {
+            const embed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Invalid Duration')
+                .setDescription('Duration must be greater than 0!')
+                .addField('📝 Examples', 
+                    '`1h` = 1 hour\n`30m` = 30 minutes\n`60s` = 60 seconds');
+            
+            return message.reply({ embeds: [embed] });
+        }
+        
+        // Max 6 hours check
+        const maxMs = 6 * 3600000; // 6 hours
+        if (totalMs > maxMs) {
+            const embed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Duration Too Long')
+                .setDescription('Maximum timeout duration is 6 hours!');
+            
+            return message.reply({ embeds: [embed] });
+        }
+        
+        // Check if can timeout this user
+        if (!targetMember.moderatable) {
+            const embed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Cannot Timeout')
+                .setDescription(`Cannot timeout ${targetMember.user.tag}! They may have higher permissions.`);
+            
+            return message.reply({ embeds: [embed] });
+        }
+        
+        // Format display duration
+        const hours = Math.floor(totalMs / 3600000);
+        const minutes = Math.floor((totalMs % 3600000) / 60000);
+        const seconds = Math.floor((totalMs % 60000) / 1000);
+        let displayDuration = '';
+        if (hours > 0) displayDuration += `${hours}h `;
+        if (minutes > 0) displayDuration += `${minutes}m `;
+        if (seconds > 0) displayDuration += `${seconds}s`;
+        displayDuration = displayDuration.trim() || '0s';
+        
+        // Apply timeout
+        await targetMember.timeout(totalMs, `Timed out by ${message.author.tag} for ${displayDuration}`);
+        
+        // Success embed
+        const embed = new PremiumEmbed()
+            .setSuccess()
+            .setTitle('🔇 Member Timed Out')
+            .setDescription(`${targetMember.user.tag} has been timed out!`)
+            .addField('👤 User', `${targetMember.user}`, true)
+            .addField('🆔 User ID', targetMember.id, true)
+            .addField('⏰ Duration', displayDuration, true)
+            .addField('⏱️ Total Time', `${Math.floor(totalMs / 1000)} seconds`, true)
+            .addField('👮 Staff', `${message.author.tag}`, true)
+            .addField('⏳ Expires', `<t:${Math.floor((Date.now() + totalMs) / 1000)}:R>`, true)
+            .setThumbnail(targetMember.user.displayAvatarURL({ dynamic: true }))
+            .setFooter({ text: `Timeout by ${message.author.tag}` })
+            .setTimestamp();
+        
+        await message.reply({ embeds: [embed] });
+        
+        // Log
+        if (guildData.settings?.logChannel) {
+            const logEmbed = new EmbedBuilder()
+                .setColor(0xFFA500)
+                .setTitle('🔇 Member Timed Out')
+                .setDescription(`${targetMember.user.tag} has been timed out!`)
+                .addFields(
+                    { name: 'User', value: `${targetMember.user.tag}`, inline: true },
+                    { name: 'Duration', value: displayDuration, inline: true },
+                    { name: 'Staff', value: `${message.author.tag}`, inline: true }
+                )
+                .setTimestamp();
+            
+            await sendLog(message.guild, guildData.settings.logChannel, logEmbed);
+        }
+        
+    } catch (error) {
+        console.error('Staff Timeout Error:', error);
+        
+        const embed = new PremiumEmbed()
+            .setError()
+            .setTitle('❌ Error')
+            .setDescription('Failed to timeout user. Check bot permissions.\n' + error.message);
+        await message.reply({ embeds: [embed] });
+    }
 }
