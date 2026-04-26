@@ -54,7 +54,8 @@ module.exports = {
                     antiSpamEnabled: true,
                     xpEnabled: true,
                     xpPerMessage: 5
-                }
+                },
+                blacklist: []
             });
             await guildData.save();
         }
@@ -65,6 +66,21 @@ module.exports = {
         if (message.content.startsWith(prefix)) {
             const args = message.content.slice(prefix.length).trim().split(/ +/);
             const commandName = args.shift().toLowerCase();
+            
+            // ✅ BLACKLIST CHECK FOR PUBLIC COMMANDS
+            const isBlacklisted = guildData.blacklist?.some(b => b.userId === message.author.id);
+            if (isBlacklisted) {
+                const blacklistEmbed = new PremiumEmbed()
+                    .setError()
+                    .setTitle('🚫 Access Denied')
+                    .setDescription('You are blacklisted and cannot use bot commands!')
+                    .addField('Reason', 'You have been restricted from using bot features.')
+                    .setFooter({ text: 'Contact an Subhan for more information.' });
+                
+                return message.reply({ embeds: [blacklistEmbed] });
+            }
+            
+            logger.info(`Prefix command used: ${commandName} by ${message.author.tag}`);
             
             // XP Commands
             if (commandName === 'xp') {
@@ -107,13 +123,20 @@ module.exports = {
             return;
         }
 
-        // XP System - SAB KO XP DENA HAI (Including Admin)
+        // XP System - Blacklist check ke saath
         if (guildData.settings.xpEnabled) {
+            // ✅ BLACKLIST CHECK - Agar user blacklisted hai to XP nahi milega
+            const isBlacklisted = guildData.blacklist?.some(b => b.userId === message.author.id);
+            
+            if (isBlacklisted) {
+                return; // Blacklisted user - no XP, silently return
+            }
+            
             const xpChannelId = guildData.settings.xpChannel;
             
             // Agar XP channel set hai to sirf usi channel mein XP milega
             if (xpChannelId && message.channel.id !== xpChannelId) {
-                return;
+                return; // Not the XP channel, no XP given
             }
             
             // Anti-spam check
@@ -156,7 +179,7 @@ module.exports = {
                 }
             }
             
-            // Check cooldown - SAB KE LIYE SAME COOLDOWN
+            // Check cooldown
             const cooldownKey = `${message.guild.id}-${message.author.id}`;
             const now = Date.now();
             
@@ -170,7 +193,7 @@ module.exports = {
             try {
                 const xpAmount = guildData.settings.xpPerMessage || 5;
                 
-                // SAB KO XP DO - KOI RESTRICTION NAHI
+                // SAB KO XP DO - KOI RESTRICTION NAHI (except blacklisted)
                 const result = await User.findOneAndUpdate(
                     { userId: message.author.id, guildId: message.guild.id },
                     { 
@@ -248,7 +271,8 @@ module.exports = {
     }
 };
 
-// Command Handlers
+// ==================== COMMAND HANDLERS ====================
+
 async function handleXpCommand(message, args, client, guildData) {
     try {
         const target = message.mentions.users.first() || message.author;
@@ -532,7 +556,7 @@ async function handleInviteLeaderboardCommand(message, args, client, guildData) 
 
 async function handleHelpCommand(message, prefix, guildData) {
     const embed = new PremiumEmbed()
-        .setTitle('Saraiki Bot Commands')
+        .setTitle('📚 Bot Commands Help')
         .setDescription(`Here are all available public commands! Prefix: \`${prefix}\``)
         .addField('📊 XP Commands',
             `\`${prefix}xp\` - Check your XP and level\n` +
@@ -549,6 +573,11 @@ async function handleHelpCommand(message, prefix, guildData) {
         )
         .addField('ℹ️ Other Commands',
             `\`${prefix}help\` - Show this help menu`
+        )
+        .addField('💡 Tips',
+            '• Earn XP by chatting in the designated XP channel\n' +
+            '• Level up to unlock special features\n' +
+            '• Invite friends to climb the invite leaderboard'
         )
         .setFooter({ text: `Made By Subhan • Current Prefix: ${prefix}` });
     
