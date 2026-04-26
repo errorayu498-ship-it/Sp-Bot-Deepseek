@@ -24,6 +24,12 @@ const guildSchema = new mongoose.Schema({
         addedBy: { type: String },
         addedAt: { type: Date, default: Date.now }
     }],
+    staff: [{
+        userId: { type: String, required: true },
+        username: { type: String },
+        addedBy: { type: String },
+        addedAt: { type: Date, default: Date.now }
+    }],
     stats: {
         totalGiveaways: { type: Number, default: 0 },
         totalXpGiven: { type: Number, default: 0 },
