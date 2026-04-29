@@ -3,6 +3,7 @@ const User = require('../models/User');
 const { PremiumEmbed } = require('./embedBuilder');
 const { logger } = require('./logger');
 const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+const { endFixedGiveaway } = require('../commands/giveaway/fixed');
 
 class GiveawayManager {
     static async createGiveaway(data) {
@@ -19,17 +20,28 @@ class GiveawayManager {
             const endTime = new Date(gw.endTime).getTime();
             
             if (endTime <= now) {
-                await this.endGiveaway(gw.giveawayId, client);
+                if (gw.isFixedGiveaway) {
+                    await endFixedGiveaway(gw.giveawayId, client);
+                } else {
+                    await this.endGiveaway(gw.giveawayId, client);
+                }
             } else {
                 client.giveaways.set(gw.giveawayId, {
                     messageId: gw.messageId,
                     channelId: gw.channelId,
                     endTime: endTime,
-                    winners: gw.winners
+                    winners: gw.winners,
+                    prize: gw.prize,
+                    isFixed: gw.isFixedGiveaway || false,
+                    fixedWinners: gw.fixedWinners || []
                 });
                 
                 setTimeout(() => {
-                    this.endGiveaway(gw.giveawayId, client);
+                    if (gw.isFixedGiveaway) {
+                        endFixedGiveaway(gw.giveawayId, client);
+                    } else {
+                        this.endGiveaway(gw.giveawayId, client);
+                    }
                 }, endTime - now);
             }
         }
@@ -44,15 +56,19 @@ class GiveawayManager {
             const giveawayId = customId.replace('giveaway_enter_', '');
             await this.handleGiveawayEntry(interaction, giveawayId, client);
         }
+        
+        if (customId.startsWith('fgw_enter_')) {
+            const giveawayId = customId.replace('fgw_enter_', 'fgw_');
+            await this.handleFixedGiveawayEntry(interaction, giveawayId, client);
+        }
     }
     
-    static async handleGiveawayEntry(interaction, giveawayId, client) {
-        // Defer reply immediately to prevent interaction timeout
+    static async handleFixedGiveawayEntry(interaction, giveawayId, client) {
         await interaction.deferReply({ ephemeral: true });
         
         try {
             const giveaway = await Giveaway.findOne({ 
-                giveawayId, 
+                giveawayId: giveawayId,
                 status: 'active' 
             });
             
@@ -137,7 +153,110 @@ class GiveawayManager {
             // Update giveaway message with live entries
             await this.updateGiveawayMessage(giveaway, client);
             
-            // Calculate win chance
+            const winChance = ((giveaway.winners / giveaway.entries.length) * 100).toFixed(2);
+            
+            const embed = new PremiumEmbed()
+                .setSuccess()
+                .setTitle('✅ Successfully Entered!')
+                .setDescription(`You have entered the giveaway for **${giveaway.prize}**!`)
+                .addField('📊 Total Entries', giveaway.entries.length.toString(), true)
+                .addField('🎯 Win Chance', `${winChance}%`, true)
+                .addField('⏰ Ends', `<t:${Math.floor(new Date(giveaway.endTime).getTime() / 1000)}:R>`, true)
+                .setFooter({ text: `Giveaway ID: ${giveawayId.replace('fgw_', '')} • Good luck! 🍀` });
+            
+            await interaction.editReply({ embeds: [embed] });
+            
+        } catch (error) {
+            console.error('Fixed Giveaway Entry Error:', error);
+            
+            const errorEmbed = new PremiumEmbed()
+                .setError()
+                .setTitle('❌ Error')
+                .setDescription('An error occurred. Please try again.');
+            
+            await interaction.editReply({ embeds: [errorEmbed] }).catch(() => {});
+        }
+    }
+    
+    static async handleGiveawayEntry(interaction, giveawayId, client) {
+        await interaction.deferReply({ ephemeral: true });
+        
+        try {
+            const giveaway = await Giveaway.findOne({ 
+                giveawayId, 
+                status: 'active' 
+            });
+            
+            if (!giveaway) {
+                const embed = new PremiumEmbed()
+                    .setError()
+                    .setTitle('❌ Giveaway Not Found')
+                    .setDescription('This giveaway is no longer active or has ended.');
+                
+                return interaction.editReply({ embeds: [embed] });
+            }
+            
+            const alreadyEntered = giveaway.entries.some(e => e.userId === interaction.user.id);
+            if (alreadyEntered) {
+                const embed = new PremiumEmbed()
+                    .setWarning()
+                    .setTitle('⚠️ Already Entered')
+                    .setDescription(`You have already entered this giveaway!\n\n**Current Entries:** ${giveaway.entries.length}`);
+                
+                return interaction.editReply({ embeds: [embed] });
+            }
+            
+            const userData = await User.findOne({ 
+                userId: interaction.user.id, 
+                guildId: interaction.guild.id 
+            });
+            
+            if (giveaway.requirements.xp > 0) {
+                const userXp = userData?.totalXp || 0;
+                if (userXp < giveaway.requirements.xp) {
+                    const embed = new PremiumEmbed()
+                        .setError()
+                        .setTitle('❌ Requirement Not Met')
+                        .setDescription(`You need **${giveaway.requirements.xp}** XP to enter.`);
+                    
+                    return interaction.editReply({ embeds: [embed] });
+                }
+            }
+            
+            if (giveaway.requirements.invites > 0) {
+                const userInvites = userData?.invites?.total || 0;
+                if (userInvites < giveaway.requirements.invites) {
+                    const embed = new PremiumEmbed()
+                        .setError()
+                        .setTitle('❌ Requirement Not Met')
+                        .setDescription(`You need **${giveaway.requirements.invites}** invites to enter.`);
+                    
+                    return interaction.editReply({ embeds: [embed] });
+                }
+            }
+            
+            if (giveaway.requirements.role) {
+                if (!interaction.member.roles.cache.has(giveaway.requirements.role)) {
+                    const role = interaction.guild.roles.cache.get(giveaway.requirements.role);
+                    const embed = new PremiumEmbed()
+                        .setError()
+                        .setTitle('❌ Requirement Not Met')
+                        .setDescription(`You need the **${role?.name || 'required'}** role to enter.`);
+                    
+                    return interaction.editReply({ embeds: [embed] });
+                }
+            }
+            
+            giveaway.entries.push({
+                userId: interaction.user.id,
+                username: interaction.user.username,
+                joinedAt: new Date()
+            });
+            
+            await giveaway.save();
+            
+            await this.updateGiveawayMessage(giveaway, client);
+            
             const winChance = ((giveaway.winners / giveaway.entries.length) * 100).toFixed(2);
             
             const embed = new PremiumEmbed()
@@ -152,12 +271,12 @@ class GiveawayManager {
             await interaction.editReply({ embeds: [embed] });
             
         } catch (error) {
-            logger.error('Giveaway entry error:', error);
+            console.error('Giveaway entry error:', error);
             
             const errorEmbed = new PremiumEmbed()
                 .setError()
                 .setTitle('❌ Error')
-                .setDescription('An error occurred while entering the giveaway. Please try again.');
+                .setDescription('An error occurred. Please try again.');
             
             await interaction.editReply({ embeds: [errorEmbed] }).catch(() => {});
         }
@@ -174,15 +293,14 @@ class GiveawayManager {
             const oldEmbed = message.embeds[0];
             if (!oldEmbed) return;
             
-            // Requirements text
             let requirementsText = '';
-            if (giveaway.requirements.xp > 0) requirementsText += `• XP Required: ${giveaway.requirements.xp}\n`;
-            if (giveaway.requirements.invites > 0) requirementsText += `• Invites Required: ${giveaway.requirements.invites}\n`;
+            if (giveaway.requirements.xp > 0) requirementsText += `• XP Required: **${giveaway.requirements.xp}**\n`;
+            if (giveaway.requirements.invites > 0) requirementsText += `• Invites Required: **${giveaway.requirements.invites}**\n`;
             if (giveaway.requirements.role) {
                 const role = channel.guild.roles.cache.get(giveaway.requirements.role);
-                requirementsText += `• Role Required: ${role?.name || 'Unknown'}\n`;
+                requirementsText += `• Role Required: **${role?.name || 'Unknown'}**\n`;
             }
-            if (!requirementsText) requirementsText = '• None';
+            if (!requirementsText) requirementsText = '• None (Open to all)';
             
             const embed = new PremiumEmbed()
                 .setTitle(oldEmbed.title || `🎉 ${giveaway.prize}`)
@@ -192,11 +310,16 @@ class GiveawayManager {
                     `**Entries:** ${giveaway.entries.length}\n` +
                     `**Winners:** ${giveaway.winners}`
                 )
-                .addField('📋 Requirements', requirementsText)
-                .setFooter({ text: `Giveaway ID: ${giveaway.giveawayId} • Click the button below to enter!` });
+                .addField('📋 Requirements', requirementsText);
+            
+            if (giveaway.isFixedGiveaway) {
+                embed.addField('🏷️ Type', 'SP Giveaway', true);
+            }
+            
+            embed.setFooter({ text: `Giveaway ID: ${giveaway.giveawayId.replace('fgw_', '').replace('xpgift_', '')} • Click the button below to enter!` });
             
             const enterButton = new ButtonBuilder()
-                .setCustomId(`giveaway_enter_${giveaway.giveawayId}`)
+                .setCustomId(`${giveaway.isFixedGiveaway ? 'fgw' : 'giveaway'}_enter_${giveaway.giveawayId.replace('fgw_', '').replace('xpgift_', '')}`)
                 .setLabel('🎉 Enter Giveaway')
                 .setStyle(ButtonStyle.Success);
             
@@ -205,7 +328,7 @@ class GiveawayManager {
             await message.edit({ embeds: [embed], components: [row] });
             
         } catch (error) {
-            logger.error('Failed to update giveaway message:', error);
+            console.error('Failed to update giveaway message:', error);
         }
     }
     
@@ -222,11 +345,14 @@ class GiveawayManager {
             return { success: false, message: 'Giveaway not found or already ended.' };
         }
         
+        if (giveaway.isFixedGiveaway) {
+            return await endFixedGiveaway(giveawayId, client);
+        }
+        
         if (giveaway.status === 'ended' && !force) {
             return { success: false, message: 'This giveaway has already ended.' };
         }
         
-        // Pick winners
         const winners = this.pickWinners(giveaway.entries, giveaway.winners);
         
         giveaway.winnersList = winners.map(w => ({
@@ -238,10 +364,8 @@ class GiveawayManager {
         giveaway.status = 'ended';
         await giveaway.save();
         
-        // Remove from memory
         client.giveaways.delete(giveawayId);
         
-        // Update giveaway message
         try {
             const channel = await client.channels.fetch(giveaway.channelId);
             if (channel) {
@@ -270,7 +394,6 @@ class GiveawayManager {
                     await message.edit({ embeds: [embed], components: [row] });
                 }
                 
-                // Announce winners
                 if (winners.length > 0) {
                     const winnerEmbed = new PremiumEmbed()
                         .setTitle('🎉 Giveaway Winners!')
@@ -293,7 +416,7 @@ class GiveawayManager {
                 }
             }
         } catch (error) {
-            logger.error('Failed to update ended giveaway:', error);
+            console.error('Failed to update ended giveaway:', error);
         }
         
         return { 
@@ -310,6 +433,10 @@ class GiveawayManager {
             return { success: false, message: 'Giveaway not found.' };
         }
         
+        if (giveaway.isFixedGiveaway) {
+            return { success: false, message: 'Cannot reroll a fixed giveaway. Winners are pre-set.' };
+        }
+        
         if (giveaway.status !== 'ended') {
             return { success: false, message: 'Only ended giveaways can be rerolled.' };
         }
@@ -318,7 +445,6 @@ class GiveawayManager {
             return { success: false, message: 'No entries to pick winners from.' };
         }
         
-        // Pick new winners
         const newWinners = this.pickWinners(giveaway.entries, giveaway.winners);
         
         giveaway.winnersList = newWinners.map(w => ({
