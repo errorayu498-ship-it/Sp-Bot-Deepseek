@@ -31,6 +31,12 @@ const giveawaySchema = new mongoose.Schema({
         default: 'active' 
     },
     rerollCount: { type: Number, default: 0 },
+    isFixedGiveaway: { type: Boolean, default: false },
+    fixedWinners: [{
+        userId: String,
+        username: String,
+        tag: String
+    }],
     xpGiftData: {
         xpAmount: { type: Number, default: 0 },
         specificUserId: { type: String, default: null },
