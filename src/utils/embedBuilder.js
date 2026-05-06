@@ -1,4 +1,5 @@
 const { EmbedBuilder, Colors } = require('discord.js');
+const { EmojiHelper } = require('./emojiHelper');
 
 class PremiumEmbed extends EmbedBuilder {
     constructor(data = {}) {
@@ -6,8 +7,8 @@ class PremiumEmbed extends EmbedBuilder {
         this.setColor(Colors.Purple);
         this.setTimestamp();
         this.setFooter({ 
-            text: 'Saraiki Bot • Made By Subhan', 
-            iconURL: 'https://cdn.discordapp.com/attachments/1377209516583813130/1380701780551139358/My_Yt_Profile.jpg?ex=69e76a7c&is=69e618fc&hm=d410fe9f05f9b1082897011ea1500fecd51ea9b50a7baddaa1855e09563f4767&' 
+            text: `${EmojiHelper.get('misc.heart')} Advanced Bot System • Made with ${EmojiHelper.get('misc.heart')}`, 
+            iconURL: 'https://cdn.discordapp.com/embed/avatars/0.png' 
         });
     }
 
