@@ -1,74 +1,53 @@
-// =====================================================
-// CUSTOM EMOJIS CONFIGURATION
-// =====================================================
-// Yahan aap apne custom emojis set kar sakte hain
-// Emoji ID ya standard emoji use karein
-// 
-// Format:
-// <:emoji_name:emoji_id> - Custom Discord Emoji
-// 🎉 - Standard Emoji
-//
-// Example:
-// success: '<:success:123456789012345678>',
-// error: '<:error:123456789012345678>',
-// 
-// Custom emoji ID lene ke liye:
-// 1. Discord mein emoji type karein
-// 2. Emoji ke aage \ (backslash) lagayein
-// 3. Send karein to ID mil jayegi
-//    Example: <:emoji_name:123456789012345678>
-// =====================================================
-
 module.exports = {
     // ==================== GIVEAWAY EMOJIS ====================
     giveaway: {
-        create: '🎉',              // /cgw command
-        enter: '🎉',               // Enter giveaway button
-        ended: '🏁',               // Giveaway ended
-        cancelled: '❌',           // Giveaway cancelled
-        winner: '👑',              // Winner announcement
-        noWinner: '😢',            // No entries
-        prize: '🎁',              // Prize
-        timer: '⏰',              // Timer/duration
-        entries: '📊',            // Entry count
-        host: '👤',               // Host
-        requirements: '📋',       // Requirements
-        reroll: '🔄',             // Reroll giveaway
+        create: '<a:700279sparkles:1501725645137514759>',              // /cgw command
+        enter: '<a:700279sparkles:1501725645137514759>',               // Enter giveaway button
+        ended: '<:68840poordogreading:1501725631837114498>',               // Giveaway ended
+        cancelled: '<:249630gradientcrossmark:1501725642637443243>',           // Giveaway cancelled
+        winner: '<a:thekings:1379113043769688116>',              // Winner announcement
+        noWinner: '<a:crysad:1379107817314586644>',            // No entries
+        prize: '<:83931msppresent:1501725654423441551>',              // Prize
+        timer: '<a:TimerSand:1501716711391625307>',              // Timer/duration
+        entries: '<:442795happy:1501725640880029766>',            // Entry count
+        host: '<:2552criminalcat:1501725650334126210>',               // Host
+        requirements: '<:26500tasks:1501725648446689321>',       // Requirements
+        reroll: '<:5772_Recycle:1501725639252770827>',             // Reroll giveaway
         delete: '🗑️',            // Delete giveaway
-        info: 'ℹ️',              // Giveaway info
-        fixed: '🎯',             // Fixed giveaway
+        info: '<a:AttentionAnimated:1384936981066420390>',              // Giveaway info
+        fixed: '<:712506prisimlevelingids:1501725625021632614>',             // Fixed giveaway
         claim: '⚡',              // XP Gift claim
         giftId: '🏷️',           // Gift ID
     },
 
     // ==================== XP SYSTEM EMOJIS ====================
     xp: {
-        earn: '✨',               // XP earned
-        levelUp: '🎉',            // Level up
-        level: '📈',              // Level
-        totalXp: '💫',           // Total XP
-        currentXp: '✨',          // Current XP
+        earn: '<a:949568money:1501725635159130182>',               // XP earned
+        levelUp: '<a:700279sparkles:1501725645137514759>',            // Level up
+        level: '<a:700279sparkles:1501725645137514759>',              // Level
+        totalXp: '<a:949568money:1501725635159130182>',           // Total XP
+        currentXp: '<:68840poordogreading:1501725631837114498>',          // Current XP
         messages: '💬',           // Messages count
-        progress: '📊',           // Progress bar
-        nextLevel: '⬆️',         // XP to next level
-        leaderboard: '🏆',        // Leaderboard
-        rank1: '🥇',             // First place
-        rank2: '🥈',             // Second place
-        rank3: '🥉',             // Third place
-        rank: '📍',              // User rank
+        progress: '<a:700279sparkles:1501725645137514759>',           // Progress bar
+        nextLevel: '<:48244meruperfect:1501725652431278092>',         // XP to next level
+        leaderboard: '<a:Trophy_fixed:1501718021415112755>',        // Leaderboard
+        rank1: '<:712506prisimlevelingids:1501725625021632614>',             // First place
+        rank2: '<:319666prisimlevelingids:1501725627516977273>',             // Second place
+        rank3: '<:92607prisimlevelingids:1501725629693821029>',             // Third place
+        rank: '<a:700279sparkles:1501725645137514759>',              // User rank
         add: '⬆️',              // Add XP
         remove: '⬇️',           // Remove XP
-        check: '📊',             // Check XP
-        card: '📊',              // XP Card
+        check: '<a:700279sparkles:1501725645137514759>',             // Check XP
+        card: '<a:700279sparkles:1501725645137514759>',              // XP Card
     },
 
     // ==================== INVITE SYSTEM EMOJIS ====================
     invite: {
-        total: '📊',              // Total invites
-        regular: '✅',            // Regular invites
-        bonus: '🎁',             // Bonus invites
-        leaves: '❌',            // Leaves
-        fake: '🚫',             // Fake invites
+        total: '<a:700279sparkles:1501725645137514759>',              // Total invites
+        regular: '<a:Verify:1379107661576146964>',            // Regular invites
+        bonus: '<:83931msppresent:1501725654423441551>',             // Bonus invites
+        leaves: '<:249630gradientcrossmark:1501725642637443243>',            // Leaves
+        fake: '<:249630gradientcrossmark:1501725642637443243>',             // Fake invites
         leaderboard: '👥',       // Invite leaderboard
         check: '📨',            // Check invites
         info: '📨',             // Invite info
@@ -76,21 +55,21 @@ module.exports = {
 
     // ==================== ADMIN/STAFF EMOJIS ====================
     admin: {
-        panel: '🛠️',            // Admin panel
+        panel: '<:956566moderatorprogramalumni:1501725637474517102>',            // Admin panel
         settings: '⚙️',         // Settings
         help: '❓',             // Help
-        refresh: '🔄',          // Refresh
+        refresh: '<:5772_Recycle:1501725639252770827>',          // Refresh
         database: '🗄️',         // Database
-        restart: '🔄',          // Restart
+        restart: '<:5772_Recycle:1501725639252770827>',          // Restart
         reset: '⚠️',           // Reset
         delete: '🗑️',          // Delete
-        time: '⏰',            // Time
-        log: '📝',             // Log
-        status: '📊',          // Status
+        time: '<a:TimerSand:1501716711391625307>',            // Time
+        log: '<:26500tasks:1501725648446689321>',             // Log
+        status: '📊<a:700279sparkles:1501725645137514759>',          // Status
         server: '🌐',          // Server info
         bot: '🤖',            // Bot
         ping: '🏓',           // Ping
-        uptime: '⏱️',         // Uptime
+        uptime: '<a:TimerSand:1501716711391625307>',         // Uptime
         memory: '💾',          // Memory
         cpu: '💻',            // CPU
         users: '👥',          // Users
@@ -100,7 +79,7 @@ module.exports = {
 
     // ==================== STAFF COMMAND EMOJIS ====================
     staff: {
-        add: '👮',               // Add staff
+        add: '<:956566moderatorprogramalumni:1501725637474517102>',               // Add staff
         remove: '👋',            // Remove staff
         timeout: '🔇',           // Timeout
         delmsg: '🗑️',           // Delete messages
@@ -111,11 +90,11 @@ module.exports = {
 
     // ==================== BLACKLIST EMOJIS ====================
     blacklist: {
-        add: '🚫',               // Add to blacklist
-        remove: '✅',            // Remove from blacklist
-        check: '📋',            // Check blacklist
-        blocked: '🚫',          // Blocked
-        reason: '📝',           // Reason
+        add: '<:249630gradientcrossmark:1501725642637443243>',               // Add to blacklist
+        remove: '<a:Verify:1379107661576146964>',            // Remove from blacklist
+        check: '<:26500tasks:1501725648446689321>',            // Check blacklist
+        blocked: '<:249630gradientcrossmark:1501725642637443243>',          // Blocked
+        reason: '<:26500tasks:1501725648446689321>',           // Reason
     },
 
     // ==================== STATUS EMOJIS ====================
@@ -124,25 +103,25 @@ module.exports = {
         idle: '🟡',             // Idle
         dnd: '🔴',             // Do Not Disturb
         offline: '⚫',          // Offline
-        enabled: '✅',          // Enabled
-        disabled: '❌',         // Disabled
+        enabled: '<a:Verify:1379107661576146964>',          // Enabled
+        disabled: '<:249630gradientcrossmark:1501725642637443243>',         // Disabled
         active: '🟢',           // Active
         inactive: '🔴',         // Inactive
-        expired: '⏰',          // Expired
-        claimed: '✅',          // Claimed
+        expired: '<a:TimerSand:1501716711391625307>',          // Expired
+        claimed: '<a:Verify:1379107661576146964>',          // Claimed
     },
 
     // ==================== SUCCESS/ERROR EMOJIS ====================
     response: {
-        success: '✅',           // Success message
-        error: '❌',            // Error message
+        success: '<a:Verify:1379107661576146964>',           // Success message
+        error: '<:249630gradientcrossmark:1501725642637443243>',            // Error message
         warning: '⚠️',         // Warning message
-        info: 'ℹ️',            // Info message
-        loading: '⏳',          // Loading
-        denied: '🚫',           // Permission denied
-        invalid: '❌',          // Invalid input
-        confirm: '✅',          // Confirmation
-        cancel: '❌',           // Cancel
+        info: '<a:AttentionAnimated:1384936981066420390>',            // Info message
+        loading: '<a:TimerSand:1501716711391625307>',          // Loading
+        denied: '<:249630gradientcrossmark:1501725642637443243>',           // Permission denied
+        invalid: '<:249630gradientcrossmark:1501725642637443243>',          // Invalid input
+        confirm: '<a:Verify:1379107661576146964>',          // Confirmation
+        cancel: '<:249630gradientcrossmark:1501725642637443243>',           // Cancel
     },
 
     // ==================== MISC EMOJIS ====================
@@ -150,20 +129,20 @@ module.exports = {
         bot: '🤖',               // Bot related
         user: '👤',              // User
         id: '🆔',              // ID
-        reason: '📝',            // Reason
-        date: '📅',             // Date
+        reason: '<:26500tasks:1501725648446689321>',            // Reason
+        date: '<:26500tasks:1501725648446689321>',             // Date
         channel: '📺',           // Channel
         message: '💬',           // Message
-        star: '⭐',             // Star
+        star: '<a:700279sparkles:1501725645137514759>',             // Star
         heart: '❤️',           // Heart
         fire: '🔥',            // Fire
         party: '🎉',           // Party
-        gift: '🎁',            // Gift
+        gift: '<:83931msppresent:1501725654423441551>',            // Gift
         coins: '💰',           // Coins
-        crown: '👑',           // Crown
-        shield: '🛡️',         // Shield
-        lock: '🔒',            // Lock
-        unlock: '🔓',          // Unlock
+        crown: '<a:thekings:1379113043769688116>',           // Crown
+        shield: '<:956566moderatorprogramalumni:1501725637474517102>',         // Shield
+        lock: '<:956566moderatorprogramalumni:1501725637474517102>',            // Lock
+        unlock: '<:956566moderatorprogramalumni:1501725637474517102>',          // Unlock
         key: '🔑',            // Key
         bell: '🔔',           // Bell
         pin: '📌',           // Pin
@@ -171,8 +150,8 @@ module.exports = {
         search: '🔍',         // Search
         plus: '➕',            // Plus
         minus: '➖',           // Minus
-        check: '✅',           // Check
-        cross: '❌',           // Cross
+        check: '<a:Verify:1379107661576146964>',           // Check
+        cross: '<:249630gradientcrossmark:1501725642637443243>',           // Cross
         arrow_up: '⬆️',       // Arrow up
         arrow_down: '⬇️',     // Arrow down
         arrow_right: '➡️',    // Arrow right
@@ -180,17 +159,17 @@ module.exports = {
 
     // ==================== XP GIFTS EMOJIS ====================
     xpGift: {
-        gift: '🎁',              // XP Gift
+        gift: '<:83931msppresent:1501725654423441551>',              // XP Gift
         claim: '⚡',             // Claim button
-        claimed: '✅',           // Already claimed
-        amount: '✨',            // XP amount
-        restricted: '🔒',       // Restricted to user
-        anyone: '🌍',           // Anyone can claim
+        claimed: '<a:Verify:1379107661576146964>',           // Already claimed
+        amount: '<a:700279sparkles:1501725645137514759>',            // XP amount
+        restricted: '<:956566moderatorprogramalumni:1501725637474517102>',       // Restricted to user
+        anyone: '<:2552criminalcat:1501725650334126210>',           // Anyone can claim
     },
 
     // ==================== PROGRESS BAR ====================
     progressBar: {
-        filled: '█',             // Filled character
-        empty: '░',             // Empty character
+        filled: '<a:841156webarebearsgoomy:1501729918629711992>',             // Filled character
+        empty: '<a:406018lineaanimada:1501729916713177179>',             // Empty character
     }
 };
