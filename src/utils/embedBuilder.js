@@ -7,7 +7,7 @@ class PremiumEmbed extends EmbedBuilder {
         this.setColor(Colors.Purple);
         this.setTimestamp();
         this.setFooter({ 
-            text: `${EmojiHelper.get('misc.heart')} Advanced Bot System • Made with ${EmojiHelper.get('misc.heart')}`, 
+            text: `Saraiki Bot • Made By Subhan`, 
             iconURL: 'https://cdn.discordapp.com/embed/avatars/0.png' 
         });
     }
