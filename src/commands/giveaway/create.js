@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, ChannelType, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 const { PremiumEmbed } = require('../../utils/embedBuilder');
 const { GiveawayManager } = require('../../utils/giveawayManager');
+const { EmojiHelper } = require('../../utils/emojiHelper');
 const ms = require('ms');
 
 module.exports = {
@@ -48,7 +49,7 @@ module.exports = {
         
         const prize = interaction.options.getString('prize');
         const winners = interaction.options.getInteger('winners');
-        let duration = interaction.options.getString('duration') || '24h'; // Default 24 hours
+        let duration = interaction.options.getString('duration') || '24h';
         const channel = interaction.options.getChannel('channel') || interaction.channel;
         const xpReq = interaction.options.getInteger('xp_requirement') || 0;
         const inviteReq = interaction.options.getInteger('invite_requirement') || 0;
@@ -57,43 +58,35 @@ module.exports = {
         // Parse duration
         const durationMs = ms(duration);
         if (!durationMs || durationMs < 60000) {
-            const errorEmbed = new PremiumEmbed()
-                .setError()
-                .setTitle('Invalid Duration')
-                .setDescription('Duration must be at least 1 minute! Using default 24h.');
-            
             duration = '24h';
         }
         
-        const finalDurationMs = ms(duration) || 86400000; // 24h default
+        const finalDurationMs = ms(duration) || 86400000;
         const endTime = new Date(Date.now() + finalDurationMs);
-        
-        // Generate unique giveaway ID
         const giveawayId = Math.floor(1000 + Math.random() * 9000).toString();
         
-        // Requirements display
+        // Requirements display with custom emojis
         let requirementsText = '';
-        if (xpReq > 0) requirementsText += `• XP Required: ${xpReq}\n`;
-        if (inviteReq > 0) requirementsText += `• Invites Required: ${inviteReq}\n`;
-        if (roleReq) requirementsText += `• Role Required: ${roleReq}\n`;
-        if (!requirementsText) requirementsText = '• None';
+        if (xpReq > 0) requirementsText += `${EmojiHelper.get('xp.earn')} XP Required: **${xpReq}**\n`;
+        if (inviteReq > 0) requirementsText += `${EmojiHelper.get('invite.check')} Invites Required: **${inviteReq}**\n`;
+        if (roleReq) requirementsText += `${EmojiHelper.get('admin.roles')} Role Required: **${roleReq}**\n`;
+        if (!requirementsText) requirementsText = `${EmojiHelper.get('status.enabled')} None`;
         
-        // Create giveaway embed
+        // Create giveaway embed with custom emojis
         const embed = new PremiumEmbed()
-            .setTitle(`🎉 ${prize}`)
+            .setTitle(`${EmojiHelper.get('giveaway.create')} ${prize}`)
             .setDescription(
-                `**Hosted by:** ${interaction.user}\n\n` +
-                `**Ends:** <t:${Math.floor(endTime.getTime() / 1000)}:R>\n` +
-                `**Entries:** 0\n` +
-                `**Winners:** ${winners}`
+                `${EmojiHelper.get('giveaway.host')} **Hosted by:** ${interaction.user}\n\n` +
+                `${EmojiHelper.get('giveaway.timer')} **Ends:** <t:${Math.floor(endTime.getTime() / 1000)}:R>\n` +
+                `${EmojiHelper.get('giveaway.entries')} **Entries:** 0\n` +
+                `${EmojiHelper.get('giveaway.winner')} **Winners:** ${winners}`
             )
-            .addField('📋 Requirements', requirementsText)
+            .addField(`${EmojiHelper.get('giveaway.requirements')} Requirements`, requirementsText)
             .setFooter({ text: `Giveaway ID: ${giveawayId} • Click the button below to enter!` });
         
-        // Create enter button with unique custom ID
         const enterButton = new ButtonBuilder()
             .setCustomId(`giveaway_enter_${giveawayId}`)
-            .setLabel('🎉 Enter Giveaway')
+            .setLabel(`${EmojiHelper.get('giveaway.enter')} Enter Giveaway`)
             .setStyle(ButtonStyle.Success);
         
         const row = new ActionRowBuilder().addComponents(enterButton);
@@ -103,7 +96,6 @@ module.exports = {
             components: [row] 
         });
         
-        // Save to database
         await GiveawayManager.createGiveaway({
             giveawayId,
             guildId: interaction.guild.id,
@@ -121,7 +113,6 @@ module.exports = {
             endTime
         });
         
-        // Store in memory
         client.giveaways.set(giveawayId, {
             messageId: giveawayMessage.id,
             channelId: channel.id,
@@ -130,24 +121,22 @@ module.exports = {
             prize
         });
         
-        // Schedule giveaway end
         setTimeout(() => {
             GiveawayManager.endGiveaway(giveawayId, client);
         }, finalDurationMs);
         
         const successEmbed = new PremiumEmbed()
             .setSuccess()
-            .setTitle('✅ Giveaway Created!')
+            .setTitle(`${EmojiHelper.get('response.success')} Giveaway Created!`)
             .setDescription(`Giveaway created successfully in ${channel}`)
-            .addField('🎁 Prize', prize, true)
-            .addField('🆔 Giveaway ID', giveawayId, true)
-            .addField('👑 Winners', winners.toString(), true)
-            .addField('⏰ Ends', `<t:${Math.floor(endTime.getTime() / 1000)}:F>`, true)
-            .addField('📋 Requirements', requirementsText);
+            .addField(`${EmojiHelper.get('giveaway.prize')} Prize`, prize, true)
+            .addField(`${EmojiHelper.get('misc.id')} Giveaway ID`, giveawayId, true)
+            .addField(`${EmojiHelper.get('giveaway.winner')} Winners`, winners.toString(), true)
+            .addField(`${EmojiHelper.get('giveaway.timer')} Ends`, `<t:${Math.floor(endTime.getTime() / 1000)}:F>`, true)
+            .addField(`${EmojiHelper.get('giveaway.requirements')} Requirements`, requirementsText);
         
         await interaction.editReply({ embeds: [successEmbed] });
         
-        // Update guild stats
         const Guild = require('../../models/Guild');
         await Guild.findOneAndUpdate(
             { guildId: interaction.guild.id },
