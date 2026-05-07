@@ -30,11 +30,11 @@ client.cooldowns = new Collection();
 
 // Status rotation
 client.statuses = [
-    { name: 'Saraiki Bot', type: ActivityType.Playing },
-    { name: 'Made By Subhan', type: ActivityType.Playing },
-    { name: 'Powered By Saraiki-Plays', type: ActivityType.Playing },
-    { name: 'CPU Usage 81%', type: ActivityType.Playing },
-    { name: '@SARAIKI_PLAYS-S', type: ActivityType.Playing }
+    { name: 'Made By Subhan', type: ActivityType.Watching },
+    { name: 'Saraiki Bot, type: ActivityType.Watching },
+    { name: 'Multi Server Supported', type: ActivityType.Watching },
+    { name: '/help for commands', type: ActivityType.Playing },
+    { name: 'Advanced Bot By Subhan', type: ActivityType.Competing }
 ];
 
 // Load commands
@@ -101,15 +101,37 @@ const init = async () => {
         
         await client.login(process.env.DISCORD_TOKEN);
         
-        // Register slash commands
+        // ✅ Register slash commands globally
         await require('./src/utils/deployCommands')(client);
         
         logger.success('Bot initialized successfully');
+        logger.info('Slash commands are now available in ALL servers!');
     } catch (error) {
         logger.error('Failed to initialize bot:', error);
         process.exit(1);
     }
 };
+
+// ✅ When bot joins a new server, commands will automatically be available
+client.on('guildCreate', async (guild) => {
+    logger.info(`Bot added to new server: ${guild.name} (${guild.id}) - Members: ${guild.memberCount}`);
+    
+    // Commands are already global, so they'll show up automatically
+    // Just cache invites for the new server
+    try {
+        const invites = await guild.invites.fetch();
+        client.invites.set(guild.id, new Map(invites.map(invite => [invite.code, invite.uses])));
+        logger.info(`Cached ${invites.size} invites for ${guild.name}`);
+    } catch (error) {
+        logger.error(`Failed to cache invites for ${guild.name}:`, error);
+    }
+});
+
+// ✅ When bot is removed from a server
+client.on('guildDelete', async (guild) => {
+    logger.info(`Bot removed from server: ${guild.name} (${guild.id})`);
+    client.invites.delete(guild.id);
+});
 
 // Error handling
 process.on('unhandledRejection', (error) => {
@@ -123,6 +145,12 @@ process.on('uncaughtException', (error) => {
 // Graceful shutdown
 process.on('SIGINT', async () => {
     logger.warn('Received SIGINT, shutting down gracefully...');
+    await mongoose.connection.close();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    logger.warn('Received SIGTERM, shutting down gracefully...');
     await mongoose.connection.close();
     process.exit(0);
 });
