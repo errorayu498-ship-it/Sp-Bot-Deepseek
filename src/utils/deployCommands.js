@@ -15,12 +15,29 @@ module.exports = async (client) => {
         
         logger.info(`Deploying ${commands.length} slash commands...`);
         
-        const data = await rest.put(
-            Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
+        // ✅ GLOBAL COMMANDS - Sabhi servers mein show hongi
+        logger.info('Registering GLOBAL commands...');
+        
+        const globalData = await rest.put(
+            Routes.applicationCommands(process.env.CLIENT_ID),
             { body: commands }
         );
         
-        logger.success(`Successfully deployed ${data.length} slash commands!`);
+        logger.success(`Successfully deployed ${globalData.length} GLOBAL slash commands!`);
+        
+        // ✅ Also register to specific guild for instant updates (optional)
+        if (process.env.GUILD_ID) {
+            logger.info('Registering GUILD commands for instant updates...');
+            
+            const guildData = await rest.put(
+                Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
+                { body: commands }
+            );
+            
+            logger.success(`Successfully deployed ${guildData.length} GUILD slash commands!`);
+        }
+        
+        logger.info('All commands registered successfully!');
         
     } catch (error) {
         logger.error('Failed to deploy slash commands:', error);
