@@ -31,8 +31,8 @@ client.cooldowns = new Collection();
 // Status rotation
 client.statuses = [
     { name: 'Made By Subhan', type: ActivityType.Watching },
-    { name: 'Saraiki Bot, type: ActivityType.Watching },
-    { name: 'Multi Server Supported', type: ActivityType.Watching },
+    { name: 'Saraiki Bot', type: ActivityType.Watching },
+    { name: 'MultiServers Supported', type: ActivityType.Watching },
     { name: '/help for commands', type: ActivityType.Playing },
     { name: 'Advanced Bot By Subhan', type: ActivityType.Competing }
 ];
